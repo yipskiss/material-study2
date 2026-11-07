@@ -93,8 +93,10 @@ button.codechip{cursor:pointer}
 .q{font-size:18px;font-weight:500;line-height:1.5}
 .anchors{display:flex;justify-content:space-between;font-size:12.5px;color:var(--muted);margin-top:12px;padding:0 4px}
 .dots7 .dot{width:40px;height:40px;font-size:13px}
-.anchors.a7{max-width:440px;margin:10px auto 0;padding:0}
-body.big-dots .anchors.a7{max-width:460px}
+.anchors.a7{display:flex;justify-content:space-between;max-width:440px;margin:8px auto 0;padding:0 20px;line-height:1.35}
+.anchors.a7 span{width:0;display:flex;justify-content:center}
+.anchors.a7 i{flex:none;font-style:normal;text-align:center;white-space:nowrap}
+body.big-dots .anchors.a7{max-width:460px;padding:0 24px}
 .dots7 .dotrow{max-width:440px}
 .dots7 .dotrow::before{left:20px;right:20px}
 body.big-dots .dots7 .dot{width:48px;height:48px;font-size:14px}
@@ -450,7 +452,7 @@ function itemRowsHTML(){
     }
     rows+='<div class="item" data-row="'+i+'"><p class="q"><span class="mono" style="color:var(--muted);font-size:14px;margin-right:6px">'+(i+1)+'</span>'+ITEMS[i].q+'</p>'
       +'<div class="dots dots7"><div class="dotrow">'+dots+'</div></div>'
-      +'<div class="anchors a7"><span>전혀 그렇지 않다</span><span>매우 그렇다</span></div></div>';
+      +'<div class="anchors a7"><span><i>전혀<br>그렇지 않다</i></span><span><i>매우<br>그렇다</i></span></div></div>';
   }
   return rows+'</div>';
 }
