@@ -237,7 +237,7 @@ var records={},queue=[],serverAnswered={},serverOk=null,deviceId='',run=null,pay
 var settings={test:false,bigText:false,bigDots:false};
 function lsGet(k,d){try{var v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch(e){return d;}}
 function lsSet(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
-records=lsGet(LS_REC,{})||{};queue=lsGet(LS_Q,[])||[];payInfo=lsGet(LS_PAY,[])||[];settings=lsGet(LS_SET,settings)||settings;
+records=lsGet(LS_REC,{})||{};queue=lsGet(LS_Q,[])||[];payInfo=(lsGet(LS_PAY,[])||[]).filter(function(p){return !p.synced;});settings=lsGet(LS_SET,settings)||settings;
 try{adminKey=localStorage.getItem(LS_AKEY)||'';}catch(e){}
 try{deviceId=localStorage.getItem(LS_DEV)||'';if(!deviceId){deviceId='dev-'+Math.random().toString(36).slice(2,8);localStorage.setItem(LS_DEV,deviceId);}}catch(e){deviceId='dev-x';}
 try{run=JSON.parse(sessionStorage.getItem(SS_RUN)||'null');}catch(e){run=null;}
@@ -307,7 +307,7 @@ function saveRecord(pid,trial,ratings,rateSec){
   var o=ordOf(pid)[trial-1],now=Date.now();
   var rec={pid:pid,cond:COND_KEY[condOf(pid)],trial:trial,set:o.set,level:o.level,pos:o.pos,material:o.material,
     ratings:ratings,rateSec:rateSec,ts:new Date(now).toISOString(),client:deviceId+(settings.test?'-test':'')};
-  (records[pid]=records[pid]||{})[trial]={m:o.material,r:ratings,t:now};
+  (records[pid]=records[pid]||{})[trial]={m:o.material,r:ratings,t:now,s:rateSec};
   queue.push(rec);saveRecords();saveQueue();
 }
 function randRatings(){var r=[];for(var i=0;i<N_ITEMS;i++)r.push(1+Math.floor(Math.random()*LIKERT_MAX));return r;}
@@ -613,8 +613,9 @@ function fetchPayList(){
     if(res&&res.ok){
       serverPay=res.list||[];payFetchState='ok';
       var ids={};serverPay.forEach(function(p){ids[p.id]=true;});
-      var ch=false;payInfo.forEach(function(p){if(p.id&&ids[p.id]&&!p.synced){p.synced=true;ch=true;}});
-      if(ch)savePay();
+      var before=payInfo.length;
+      payInfo=payInfo.filter(function(p){return !(p.id&&ids[p.id]);});   // 서버에 있는 건 이 기기에서 삭제
+      if(payInfo.length!==before)savePay();
       if(route.v==='admin')render();return true;
     }
     payFetchState=(res&&res.error==='bad_admin_key')?'badkey':'err';if(route.v==='admin')render();return false;
@@ -624,7 +625,9 @@ function syncPay(){
   if(!ENDPOINT)return Promise.resolve(false);
   var chain=Promise.resolve();
   payInfo.filter(function(p){return !p.synced;}).forEach(function(p){
-    chain=chain.then(function(){return post({action:'addinfo',info:p}).then(function(res){if(res&&res.ok){p.synced=true;savePay();}},function(){});});
+    chain=chain.then(function(){return post({action:'addinfo',info:p}).then(function(res){
+      if(res&&res.ok){payInfo=payInfo.filter(function(x){return x.id!==p.id;});savePay();}   // 서버 저장 확인 → 이 기기의 개인정보 사본 삭제
+    },function(){});});
   });
   return chain.then(function(){return adminKey?fetchPayList():true;});
 }
@@ -677,7 +680,7 @@ function buildCSV(){
     var rs=records[pid]||{};
     Object.keys(rs).map(Number).sort(function(a,b){return a-b;}).forEach(function(t){
       var o=ordOf(pid)[t-1],rec=rs[t];
-      lines.push([pid,COND_KEY[condOf(pid)],t,o.set,o.level,o.pos,o.material].concat(rec.r).concat(['',new Date(rec.t).toISOString()]).join(','));
+      lines.push([pid,COND_KEY[condOf(pid)],t,o.set,o.level,o.pos,o.material].concat(rec.r).concat([rec.s==null?'':rec.s,new Date(rec.t).toISOString()]).join(','));
     });
   });
   return '﻿'+lines.join('\r\n');
@@ -751,10 +754,15 @@ function arm(key){armed=key;setTimeout(function(){if(armed===key){armed=null;if(
 app.addEventListener('click',function(e){
   var b=e.target.closest?e.target.closest('[data-act]'):null;if(!b)return;
   var act=b.getAttribute('data-act');
+  // 화면이 막 바뀐 직후의 더블탭이 엉뚱한 버튼(점수·나가기)을 누르지 않도록 무시 (테스트 모드 제외)
+  if(!settings.test&&route.v==='run'&&run&&(act==='dot'||act==='submit'||act==='leave')&&Date.now()-run.phStart<700)return;
   if(act==='pick'){startPid(b.getAttribute('data-pid'));}
   else if(act==='goinfo'){infoSaved=false;pendingInfoPid=null;go({v:'info'});}
   else if(act==='goinfo-run'){infoSaved=false;pendingInfoPid=run?run.pid:null;go({v:'info'});}
-  else if(act==='leave'){leaveRun();}
+  else if(act==='leave'){
+    if(run&&run.ph!=='done'&&!confirm('세션을 나가시겠습니까? 진행 중인 응답은 저장되지 않습니다.'))return;
+    leaveRun();
+  }
   else if(act==='showcode'){showCode(b,Number(b.getAttribute('data-trial')));}
   else if(act==='begin'){setPhase('obs');}
   else if(act==='startrate'){setPhase('rate');}
