@@ -271,16 +271,24 @@ function post(body){
   return fetch(ENDPOINT,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(body),redirect:'follow'})
     .then(function(r){return r.json();});
 }
-var flushing=false;
+var flushing=false,retryT=null;
+function scheduleRetry(){
+  if(retryT||!queue.length)return;
+  retryT=setTimeout(function(){retryT=null;flush();},15000);
+}
 function flush(){
   if(!ENDPOINT||!queue.length||flushing)return Promise.resolve(false);
   flushing=true;
   var batch=queue.slice();
   return post({records:batch}).then(function(res){
     flushing=false;
-    if(res&&res.ok){queue=queue.filter(function(q){return batch.indexOf(q)<0;});saveQueue();return true;}
-    return false;
-  },function(){flushing=false;return false;});
+    if(res&&res.ok){
+      queue=queue.filter(function(q){return batch.indexOf(q)<0;});saveQueue();
+      if(queue.length)return flush();   // 전송 중에 쌓인 응답이 있으면 이어서 전송
+      return true;
+    }
+    scheduleRetry();return false;
+  },function(){flushing=false;scheduleRetry();return false;});
 }
 function refresh(){
   if(!ENDPOINT)return Promise.resolve(false);
