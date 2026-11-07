@@ -93,6 +93,8 @@ button.codechip{cursor:pointer}
 .q{font-size:18px;font-weight:500;line-height:1.5}
 .anchors{display:flex;justify-content:space-between;font-size:12.5px;color:var(--muted);margin-top:12px;padding:0 4px}
 .dots7 .dot{width:40px;height:40px;font-size:13px}
+.anchors.a7{max-width:440px;margin:10px auto 0;padding:0}
+body.big-dots .anchors.a7{max-width:460px}
 .dots7 .dotrow{max-width:440px}
 .dots7 .dotrow::before{left:20px;right:20px}
 body.big-dots .dots7 .dot{width:48px;height:48px;font-size:14px}
@@ -175,8 +177,8 @@ var N_PER_GROUP=40;
 
 var LEVELS={Low:['PL7','PL11','PL12'],Mid:['PL6','PL10','PL14'],High:['PL1','PL3','PL9']};
 var PERMS=[['Low','Mid','High'],['Low','High','Mid'],['Mid','Low','High'],['Mid','High','Low'],['High','Low','Mid'],['High','Mid','Low']];
-var POS_LABEL=['왼쪽','가운데','오른쪽'];
-var POS_NUM=['①','②','③'];
+var POS_LABEL=['첫 번째','두 번째','세 번째'];   // 세트 안에서의 순서
+var POS_SHORT=['첫째','둘째','셋째'];
 var COND_LABEL={V:'시각',T:'시각+촉각'};
 var COND_KEY={V:'visual',T:'visual+touch'};
 
@@ -385,7 +387,7 @@ function codeChipHTML(trial){
 }
 function showCode(btn,trial){
   var o=ordOf(run.pid),s=o[trial-1].set,list=[];
-  for(var i=0;i<o.length;i++){if(o[i].set===s)list.push(POS_LABEL[o[i].pos-1]+' '+o[i].material);}
+  for(var i=0;i<o.length;i++){if(o[i].set===s)list.push(POS_SHORT[o[i].pos-1]+' '+o[i].material);}
   btn.classList.remove('masked');btn.style.fontSize='18px';btn.textContent=list.join(' · ');
   if(codeTimer)clearTimeout(codeTimer);
   codeTimer=setTimeout(function(){
@@ -413,7 +415,7 @@ function renderIntro(){
     +'<li>시편은 3개씩 3세트, 총 <b>9개</b>입니다.</li>'
     +'<li>시편마다 <b>'+OBS_SEC+'초</b> 관찰한 뒤, 18개 문항에 응답합니다 (1~7점).</li>'
     +touchGuideHTML()
-    +'<li>프레임의 시편을 <b>왼쪽부터 ①②③</b> 순서로 평가합니다.</li>'
+    +'<li>세트마다 시편 3개를 <b>하나씩 순서대로</b> 관찰하고 평가합니다.</li>'
     +'<li>세트가 끝나면 진행자가 시편을 교체합니다. 정답은 없으니 느낀 대로 응답해 주세요.</li>'
     +'</ul></div>'
     +'<div class="btnrow" style="margin-top:28px"><button class="btn wide" data-act="begin">첫 세트 시작</button></div>'
@@ -427,18 +429,15 @@ function renderObs(){
   var o=ordOf(run.pid)[run.trial-1],touch=condOf(run.pid)==='T';
   app.innerHTML='<div class="wrap center vwrap">'+bannerHTML()
     +'<p class="eyebrow">세트 '+o.set+' / 3 · 시편 '+run.trial+' / '+TOTAL_TRIALS+'</p>'
-    +'<h1 style="font-size:26px;margin-top:14px">'+POS_NUM[o.pos-1]+' '+POS_LABEL[o.pos-1]+' 시편을 관찰해 주세요</h1>'
+    +'<h1 style="font-size:26px;margin-top:14px">'+POS_LABEL[o.pos-1]+' 시편을 관찰해 주세요</h1>'
     +'<p class="sub" style="font-size:16px;margin-top:14px">'+(touch?'눈으로 보면서 <b>손가락·손바닥으로 표면만</b> 만져 보세요.<br><span style="color:var(--danger)">두드리기·구부리기·들어보기는 하지 마세요.</span>':'눈으로만 관찰해 주세요.<br>시편에 손을 대지 마세요.')+'</p>'
-    +'<div class="breaktime mono" id="cd">'+OBS_SEC+'</div>'
-    +'<div class="bar" style="max-width:320px;margin:18px auto 0"><i id="cdbar" style="width:0%"></i></div>'
+    +'<div class="btnrow" id="startrate" style="margin-top:44px;display:none"><button class="btn wide" data-act="startrate">설문 시작</button></div>'
     +(settings.test?'<div class="btnrow" style="margin-top:40px"><button class="btn ghost wide" data-act="skip">관찰 건너뛰기 (테스트)</button></div>':'')
     +'<p style="margin-top:48px"><button class="backlink" data-act="leave">세션 나가기</button></p>'
     +metaLine()+'</div>';
-  var cd=document.getElementById('cd'),bar=document.getElementById('cdbar');
-  countdown(OBS_SEC*1000,function(left){
-    cd.textContent=Math.ceil(left/1000);
-    bar.style.width=Math.round((1-left/(OBS_SEC*1000))*100)+'%';
-  },function(){setPhase('rate');});
+  // 남은 시간은 참가자에게 보이지 않음 — 관찰 시간이 지나면 [설문 시작] 버튼만 나타남
+  var sb=document.getElementById('startrate');
+  countdown(OBS_SEC*1000,function(){},function(){sb.style.display='';});
 }
 
 // ─── 평가 ───
@@ -450,8 +449,8 @@ function itemRowsHTML(){
       dots+='<button class="dot" data-act="dot" data-item="'+i+'" data-val="'+v+'" aria-pressed="'+(run.draft[i]===v?'true':'false')+'">'+v+'</button>';
     }
     rows+='<div class="item" data-row="'+i+'"><p class="q"><span class="mono" style="color:var(--muted);font-size:14px;margin-right:6px">'+(i+1)+'</span>'+ITEMS[i].q+'</p>'
-      +'<div class="anchors"><span>전혀 그렇지 않다</span><span>매우 그렇다</span></div>'
-      +'<div class="dots dots7"><div class="dotrow">'+dots+'</div></div></div>';
+      +'<div class="dots dots7"><div class="dotrow">'+dots+'</div></div>'
+      +'<div class="anchors a7"><span>전혀 그렇지 않다</span><span>매우 그렇다</span></div></div>';
   }
   return rows+'</div>';
 }
@@ -462,7 +461,7 @@ function renderRate(){
     +'<div class="topbar"><div class="topline"><span class="mono">'+run.pid+' · 세트 '+o.set+' / 3</span><span>시편 <b>'+run.trial+'</b> / '+TOTAL_TRIALS+' · 응답 <b id="ansn">'+answeredN()+'</b> / '+N_ITEMS+'</span></div>'
     +'<div class="bar"><i id="ansbar" style="width:'+Math.round(countOf(run.pid)/TOTAL_TRIALS*100)+'%"></i></div></div>'
     +bannerHTML()
-    +'<p class="hint"><b>'+POS_NUM[o.pos-1]+' '+POS_LABEL[o.pos-1]+' 시편</b>에 대해, 각 문항에 얼마나 동의하는지 응답해 주세요.</p>'
+    +'<p class="hint"><b>'+POS_LABEL[o.pos-1]+' 시편</b>에 대해, 각 문항에 얼마나 동의하는지 응답해 주세요.</p>'
     +itemRowsHTML()
     +'<p class="missnote" id="missnote">아직 응답하지 않은 문항이 있습니다.</p>'
     +(settings.test?'<div class="toolrow"><button class="btn ghost" data-act="rand">랜덤 입력 (R)</button><button class="btn ghost" data-act="stepauto">랜덤+저장 (Space)</button></div>':'')
@@ -508,16 +507,13 @@ function renderBreak(){
   app.innerHTML='<div class="wrap center vwrap">'+bannerHTML()
     +'<p class="eyebrow">시편 교체</p>'
     +'<h1 style="font-size:25px;font-weight:600;line-height:1.55;margin-top:14px">세트 '+o.set+' 준비 중입니다<br>잠시 기다려 주세요</h1>'
-    +'<div class="breaktime mono" id="cd">'+BREAK_SEC+'</div>'
-    +'<div class="btnrow" style="margin-top:36px"><button class="btn wide" id="nextset" data-act="begin" disabled>세트 '+o.set+' 시작</button></div>'
+    +'<div class="btnrow" id="nextset" style="margin-top:44px;display:none"><button class="btn wide" data-act="begin">세트 '+o.set+' 시작</button></div>'
     +'<div style="margin-top:14px">'+codeChipHTML(run.trial)+'</div>'
     +(settings.test?'<p class="hint">테스트 모드: 아래 버튼으로 대기를 생략할 수 있습니다.</p><button class="btn ghost" data-act="skip">대기 건너뛰기</button>':'')
     +'<p style="margin-top:40px"><button class="backlink" data-act="leave">세션 나가기</button></p>'
     +metaLine()+'</div>';
-  var cd=document.getElementById('cd'),btn=document.getElementById('nextset');
-  countdown(BREAK_SEC*1000,function(left){cd.textContent=Math.ceil(left/1000);},function(){
-    cd.textContent='0';btn.disabled=false;
-  });
+  var nb=document.getElementById('nextset');
+  countdown(BREAK_SEC*1000,function(){},function(){nb.style.display='';});
 }
 
 function renderDone(){
@@ -683,11 +679,11 @@ function orderBoxHTML(pid){
   var o=ordOf(pid),ans=answeredSet(pid),nxt=nextTrial(pid,0),rows='';
   o.forEach(function(x){
     var d=!!ans[x.trial];
-    rows+='<tr'+(d?' style="opacity:.45"':'')+'><td>'+x.trial+(x.trial===nxt?' ◀ 다음':'')+'</td><td>세트 '+x.set+'</td><td>'+x.level+'</td><td>'+POS_NUM[x.pos-1]+' '+POS_LABEL[x.pos-1]+'</td><td class="mono"><b>'+x.material+'</b></td><td>'+(d?'✓ 저장됨':'')+'</td>'
+    rows+='<tr'+(d?' style="opacity:.45"':'')+'><td>'+x.trial+(x.trial===nxt?' ◀ 다음':'')+'</td><td>세트 '+x.set+'</td><td>'+x.level+'</td><td>'+POS_LABEL[x.pos-1]+'</td><td class="mono"><b>'+x.material+'</b></td><td>'+(d?'✓ 저장됨':'')+'</td>'
       +'<td>'+(d?'<button class="del'+(armed==='t'+pid+x.trial?' arm':'')+'" data-act="deltrial" data-pid="'+pid+'" data-trial="'+x.trial+'">'+(armed==='t'+pid+x.trial?'한 번 더 눌러 삭제':'이 시편 기록 삭제')+'</button>':'')+'</td></tr>';
   });
-  return '<p class="hint" style="margin-top:12px"><b>'+pid+'</b> ('+COND_LABEL[condOf(pid)]+') — 프레임에 <b>왼쪽부터 ①②③ 순서</b>로 놓습니다. 세트 사이 교체 30초.</p>'
-    +'<div class="tscroll"><table><thead><tr><th>시행</th><th>세트</th><th>수준</th><th>위치</th><th>시편</th><th>상태</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div>';
+  return '<p class="hint" style="margin-top:12px"><b>'+pid+'</b> ('+COND_LABEL[condOf(pid)]+') — 세트마다 표의 <b>첫 번째 → 세 번째 순서</b>대로 제시·평가합니다. 세트 사이 교체 30초.</p>'
+    +'<div class="tscroll"><table><thead><tr><th>시행</th><th>세트</th><th>수준</th><th>세트 내 순서</th><th>시편</th><th>상태</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div>';
 }
 function renderAdmin(){
   var rows='',doneN=0,partN=0;
@@ -751,6 +747,7 @@ app.addEventListener('click',function(e){
   else if(act==='leave'){leaveRun();}
   else if(act==='showcode'){showCode(b,Number(b.getAttribute('data-trial')));}
   else if(act==='begin'){setPhase('obs');}
+  else if(act==='startrate'){setPhase('rate');}
   else if(act==='skip'){if(run.ph==='obs')setPhase('rate');else setPhase('obs');}
   else if(act==='dot'){setDot(Number(b.getAttribute('data-item')),Number(b.getAttribute('data-val')));}
   else if(act==='submit'){submitRate();}
