@@ -155,6 +155,18 @@ select.psel{font:inherit;padding:10px 12px;border:1px solid var(--line);border-r
 .onum{position:absolute;top:3px;left:6px;color:var(--muted);font-size:10px;font-variant-numeric:tabular-nums}
 .ocat{font-size:11px;color:var(--muted)}
 .ocode{font-size:13.5px;font-weight:600}
+
+/* ── UX 개선 ── */
+button,a,input,select{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+.item{--dot:min(44px,calc((100vw - 104px)/7))}
+body.big-dots .item{--dot:min(54px,calc((100vw - 104px)/7))}
+.dots7 .dot,body.big-dots .dots7 .dot{width:var(--dot);height:var(--dot)}
+.dots7 .dotrow::before,body.big-dots .dots7 .dotrow::before{left:calc(var(--dot)/2);right:calc(var(--dot)/2)}
+.anchors.a7,body.big-dots .anchors.a7{padding:0 calc(var(--dot)/2)}
+.pbtn.next{border:2px solid var(--accent)}
+.pbtn.next .st{color:var(--accent);font-weight:500}
+.guide.big{font-size:17px;gap:13px}
+.scalenote{margin-top:14px;font-size:15px;color:var(--muted);text-align:left}
 </style>
 </head>
 <body>
@@ -344,8 +356,17 @@ function startPid(pid){
 }
 function leaveRun(){clearTimer();run=null;saveRun();go({v:'home'});}
 
+var wakeLock=null;
+function keepAwake(){
+  try{
+    if(!navigator.wakeLock||wakeLock||document.visibilityState!=='visible')return;
+    navigator.wakeLock.request('screen').then(function(l){wakeLock=l;l.addEventListener('release',function(){wakeLock=null;});},function(){});
+  }catch(e){}
+}
+document.addEventListener('visibilitychange',function(){if(document.visibilityState==='visible'&&route.v==='run')keepAwake();});
 function render(){
   clearTimer();
+  if(route.v==='run')keepAwake();
   if(route.v==='admin')return renderAdmin();
   if(route.v==='info')return renderInfo();
   if(route.v==='run'&&run){
@@ -370,12 +391,13 @@ function bannerHTML(){
 
 // ─── 홈 ───
 function groupGrid(prefix){
-  var doneN=0,partN=0,cells='';
+  var doneN=0,partN=0,cells='',nextMarked=false;
   for(var i=0;i<PIDS.length;i++){
     var pid=PIDS[i];if(pid.charAt(0)!==prefix)continue;
     var c=countOf(pid),cls='pbtn',st='시작 전';
     if(c>=TOTAL_TRIALS){cls+=' done';st='완료';doneN++;}
     else if(c>0){cls+=' part';st=c+' / '+TOTAL_TRIALS;partN++;}
+    else if(!nextMarked){cls+=' next';st='다음';nextMarked=true;}
     cells+='<button class="'+cls+'" data-act="pick" data-pid="'+pid+'"><span class="pid mono">'+pid+'</span><span class="st">'+st+'</span></button>';
   }
   return '<div class="sect"><p class="sectlab">'+COND_LABEL[prefix]+' 집단 ('+prefix+') — 완료 '+doneN+' · 진행 중 '+partN+'</p><div class="pgrid">'+cells+'</div></div>';
@@ -421,9 +443,10 @@ function renderIntro(){
   app.innerHTML='<div class="wrap center vwrap">'+bannerHTML()
     +'<p class="eyebrow">재생 플라스틱 소재 평가</p>'
     +'<h1 style="font-size:24px">평가를 시작합니다</h1>'
-    +'<div class="card" style="text-align:left;margin-top:18px"><ul class="guide">'
+    +'<div class="card" style="text-align:left;margin-top:18px"><ul class="guide big">'
     +'<li>시편은 3개씩 3세트, 총 <b>9개</b>입니다.</li>'
-    +'<li>시편마다 <b>'+OBS_SEC+'초</b> 관찰한 뒤, 18개 문항에 응답합니다 (1~7점).</li>'
+    +'<li>시편마다 <b>'+OBS_SEC+'초</b> 관찰한 뒤, 18개 문항에 응답합니다.</li>'
+    +'<li>응답은 <b>1점(전혀 그렇지 않다) ~ 7점(매우 그렇다)</b> 중에서 고릅니다.</li>'
     +touchGuideHTML()
     +'<li>세트마다 시편 3개를 <b>하나씩 순서대로</b> 관찰하고 평가합니다.</li>'
     +'<li>세트가 끝나면 진행자가 시편을 교체합니다. 정답은 없으니 느낀 대로 응답해 주세요.</li>'
@@ -478,7 +501,8 @@ function renderRate(){
     +'<div class="btnrow"><button class="btn wide" data-act="submit">'+(last?'평가 완료 · 저장':'저장하고 계속')+'</button></div>'
     +'</div>';
 }
-function setDot(i,v){
+function setDot(i,v,advance){
+  var wasEmpty=run.draft[i]==null;
   run.draft[i]=v;saveRun();
   var row=app.querySelector('[data-row="'+i+'"]');
   if(row){
@@ -487,6 +511,22 @@ function setDot(i,v){
     for(var k=0;k<bs.length;k++)bs[k].setAttribute('aria-pressed',String(Number(bs[k].getAttribute('data-val'))===v));
   }
   var n=document.getElementById('ansn');if(n)n.textContent=answeredN();
+  if(advance&&wasEmpty)scrollToNext(i);
+}
+function scrollToNext(i){
+  var j=-1,k;
+  for(k=i+1;k<N_ITEMS;k++){if(run.draft[k]==null){j=k;break;}}
+  var target=j>=0?app.querySelector('[data-row="'+j+'"]'):(answeredN()===N_ITEMS?app.querySelector('[data-act="submit"]'):null);
+  if(!target||!target.scrollIntoView)return;
+  var calm=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  setTimeout(function(){
+    target.scrollIntoView({block:'center',behavior:calm?'auto':'smooth'});
+    // 일부 웹뷰는 부드러운 스크롤이 멈추므로, 잠시 뒤 대상이 화면 안쪽에 없으면 즉시 이동
+    setTimeout(function(){
+      var r=target.getBoundingClientRect();
+      if(r.top<60||r.bottom>window.innerHeight-60)target.scrollIntoView({block:'center'});
+    },900);
+  },220);
 }
 function fillRandom(){var r=randRatings();for(var i=0;i<N_ITEMS;i++)setDot(i,r[i]);}
 function submitRate(){
@@ -767,7 +807,7 @@ app.addEventListener('click',function(e){
   else if(act==='begin'){setPhase('obs');}
   else if(act==='startrate'){setPhase('rate');}
   else if(act==='skip'){if(run.ph==='obs')setPhase('rate');else setPhase('obs');}
-  else if(act==='dot'){setDot(Number(b.getAttribute('data-item')),Number(b.getAttribute('data-val')));}
+  else if(act==='dot'){setDot(Number(b.getAttribute('data-item')),Number(b.getAttribute('data-val')),true);}
   else if(act==='submit'){submitRate();}
   else if(act==='rand'){fillRandom();}
   else if(act==='stepauto'){fillRandom();submitRate();}
