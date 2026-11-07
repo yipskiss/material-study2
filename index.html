@@ -1,0 +1,847 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="재질 평가 2차">
+<title>재질 평가 2차</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans+KR:wght@400;500;700&display=swap">
+<style id="css">
+:root{
+  --ground:#F2F2F1; --surface:#FFFFFF; --ink:#191A1B; --muted:#6E7176;
+  --line:#DEDFE0; --soft:#ECEDED; --accent:#6E6E6E; --accent-on:#FFFFFF;
+  --ok:#2C7A57; --ok-soft:#E3EFE9; --warn-bg:#F5EEDC; --warn-ink:#6C5619;
+  --danger:#9E3B2F; --shadow:0 1px 3px rgba(20,22,23,.07),0 8px 24px rgba(20,22,23,.06);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ground:#131415; --surface:#1C1E20; --ink:#EBECEC; --muted:#979A9F;
+    --line:#2D3033; --soft:#24272A; --accent:#A8A8A8; --accent-on:#1A1A1A;
+    --ok:#62BD93; --ok-soft:#1E2E27; --warn-bg:#312D1D; --warn-ink:#D8C070;
+    --danger:#D4796C; --shadow:0 1px 3px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.3);
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#131415; --surface:#1C1E20; --ink:#EBECEC; --muted:#979A9F;
+  --line:#2D3033; --soft:#24272A; --accent:#A8A8A8; --accent-on:#1A1A1A;
+  --ok:#62BD93; --ok-soft:#1E2E27; --warn-bg:#312D1D; --warn-ink:#D8C070;
+  --danger:#D4796C; --shadow:0 1px 3px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.3);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+body{
+  background:var(--ground); color:var(--ink);
+  font-family:'IBM Plex Sans KR','Apple SD Gothic Neo','Malgun Gothic',sans-serif;
+  font-size:16px; line-height:1.55; min-height:100vh;
+}
+button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
+button:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.mono{font-family:'IBM Plex Mono',ui-monospace,monospace}
+.wrap{max-width:660px;margin:0 auto;padding:24px 18px 64px}
+.wrap.wide{max-width:960px}
+.eyebrow{font-size:12px;font-weight:500;letter-spacing:.14em;color:var(--muted);text-transform:uppercase}
+h1{font-size:26px;font-weight:700;letter-spacing:-.01em;text-wrap:balance;margin-top:6px}
+.sub{color:var(--muted);margin-top:8px;font-size:14.5px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:20px;box-shadow:var(--shadow)}
+.banner{border-radius:10px;padding:10px 14px;font-size:13.5px;background:var(--warn-bg);color:var(--warn-ink);margin-bottom:16px}
+.banner.okb{background:var(--ok-soft);color:var(--ok)}
+.stats{display:flex;gap:18px;flex-wrap:wrap;margin:18px 0 10px;font-size:13.5px;color:var(--muted)}
+.stats b{color:var(--ink);font-weight:700;font-variant-numeric:tabular-nums}
+.pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:10px;margin-top:14px}
+.pbtn{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 8px 10px;text-align:center;transition:border-color .12s}
+.pbtn:hover{border-color:var(--accent)}
+.pbtn .pid{font-weight:600;font-size:15px}
+.pbtn .st{display:block;font-size:11.5px;margin-top:3px;color:var(--muted);font-variant-numeric:tabular-nums}
+.pbtn.part .st{color:var(--accent);font-weight:500}
+.pbtn.done{background:var(--ok-soft);border-color:transparent}
+.pbtn.done .st{color:var(--ok);font-weight:500}
+.foot{margin-top:26px;display:flex;justify-content:center}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border-radius:10px;padding:13px 22px;font-size:15.5px;font-weight:500;background:var(--accent);color:var(--accent-on);min-height:48px;text-decoration:none}
+.btn:active{transform:translateY(1px)}
+.btn.ghost{background:none;color:var(--muted);border:1px solid var(--line)}
+.btn.wide{width:100%}
+.btn[disabled]{opacity:.45;cursor:default}
+.btnrow{display:flex;flex-direction:column;gap:10px;margin-top:22px}
+.center{text-align:center}
+.trialnum{font-size:14px;color:var(--muted);font-variant-numeric:tabular-nums}
+.codechip{display:inline-block;font-family:'IBM Plex Mono',monospace;font-weight:600;font-size:40px;letter-spacing:.02em;background:var(--soft);border-radius:14px;padding:14px 30px;margin:14px 0 6px}
+.codesub{color:var(--muted);font-size:14.5px}
+button.codechip{cursor:pointer}
+.codechip.masked{font-size:17px;font-weight:500;font-family:inherit;color:var(--muted);background:none;border:1.5px dashed var(--line);padding:22px 34px}
+.guide{list-style:none;margin-top:12px;display:grid;gap:10px}
+.guide li{padding-left:20px;position:relative;font-size:14.5px}
+.guide li::before{content:"";position:absolute;left:2px;top:9px;width:7px;height:7px;border-radius:50%;background:var(--accent)}
+.topbar{position:sticky;top:0;z-index:5;background:var(--ground);padding:12px 0 10px;margin-bottom:6px}
+.topline{display:flex;justify-content:space-between;align-items:baseline;font-size:13.5px;color:var(--muted)}
+.topline b{color:var(--ink);font-variant-numeric:tabular-nums}
+.bar{height:4px;border-radius:2px;background:var(--soft);margin-top:8px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--accent);border-radius:2px;transition:width .2s}
+@media (prefers-reduced-motion:reduce){.bar i{transition:none}.btn:active{transform:none}}
+.hint{font-size:13.5px;color:var(--muted);margin:10px 0 4px}
+.sect{margin-top:20px}
+.sectlab{font-size:12px;font-weight:500;letter-spacing:.12em;color:var(--muted);margin-bottom:8px}
+.items{margin-top:14px}
+.item{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:15px 16px 16px;margin-bottom:10px}
+.item.miss{border-color:var(--danger)}
+.poles{display:flex;justify-content:space-between;gap:12px;font-size:18px;font-weight:500}
+.poles .r{text-align:right}
+.q{font-size:18px;font-weight:500;line-height:1.5}
+.anchors{display:flex;justify-content:space-between;font-size:12.5px;color:var(--muted);margin-top:12px;padding:0 4px}
+.dots7 .dot{width:40px;height:40px;font-size:13px}
+.dots7 .dotrow{max-width:440px}
+.dots7 .dotrow::before{left:20px;right:20px}
+body.big-dots .dots7 .dot{width:48px;height:48px;font-size:14px}
+.choicerow{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap}
+.choice{flex:1;min-width:88px;border:1.5px solid var(--line);border-radius:10px;padding:13px 10px;font-size:15.5px;color:var(--muted);text-align:center}
+.choice[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-on);font-weight:600}
+.etcin{width:100%;margin-top:12px;font:inherit;font-size:15px;padding:12px 14px;border:1.5px solid var(--line);border-radius:10px;background:var(--surface);color:var(--ink)}
+.etcin::placeholder{color:var(--muted);opacity:.7}
+.breaktime{font-family:'IBM Plex Mono',monospace;font-size:52px;font-weight:600;font-variant-numeric:tabular-nums;margin-top:22px}
+.dots{display:flex;justify-content:center;margin-top:14px}
+.dotrow{position:relative;display:flex;flex:1 1 auto;max-width:400px;justify-content:space-between}
+.dotrow::before{content:"";position:absolute;top:50%;left:23px;right:23px;height:1.5px;background:var(--line);transform:translateY(-50%)}
+.dot{position:relative;background:var(--surface);width:46px;height:46px;border-radius:50%;border:1.5px solid var(--line);color:var(--muted);font-size:14px;font-variant-numeric:tabular-nums;display:flex;align-items:center;justify-content:center;transition:background .1s,border-color .1s}
+.dot:hover{border-color:var(--accent)}
+.dot[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-on);font-weight:600}
+.missnote{color:var(--danger);font-size:13.5px;margin:4px 0 10px;display:none}
+.missnote.show{display:block}
+.donemark{width:64px;height:64px;border-radius:50%;background:var(--ok-soft);color:var(--ok);font-size:30px;display:flex;align-items:center;justify-content:center;margin:0 auto 16px}
+.eyeicon{display:flex;justify-content:center;color:var(--muted)}
+.vwrap{min-height:100vh;min-height:100svh;display:flex;flex-direction:column;justify-content:center;padding-top:24px;padding-bottom:32px}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{font-size:12px;letter-spacing:.08em;color:var(--muted);font-weight:500;text-align:left;padding:8px 10px;border-bottom:1px solid var(--line)}
+td{padding:9px 10px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}
+.tscroll{overflow-x:auto}
+.tag{display:inline-block;font-size:12px;border-radius:999px;padding:2px 10px;background:var(--soft);color:var(--muted)}
+.tag.done{background:var(--ok-soft);color:var(--ok)}
+.tag.part{background:var(--soft);color:var(--accent);font-weight:500}
+.del{color:var(--danger);font-size:13px;border:1px solid var(--line);border-radius:8px;padding:5px 10px}
+.del.arm{background:var(--danger);border-color:var(--danger);color:#fff}
+.admhead{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin:18px 0 14px}
+.note{font-size:13px;color:var(--muted);background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-top:16px}
+.note b{color:var(--ink)}
+.backlink{font-size:14px;color:var(--muted);display:inline-block;margin-bottom:12px}
+.modal{position:fixed;inset:0;background:color-mix(in srgb,var(--ink) 30%,transparent);display:flex;align-items:center;justify-content:center;z-index:60;padding:20px}
+.modal .box{background:var(--surface);border-radius:14px;padding:20px;max-width:640px;width:100%;box-shadow:var(--shadow)}
+.modal textarea{width:100%;height:240px;margin:12px 0;font-family:'IBM Plex Mono',monospace;font-size:12px;background:var(--soft);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:10px}
+body.big-text{font-size:17.5px}
+body.big-dots .dot{width:58px;height:58px;font-size:16px}
+body.big-dots .dotrow{max-width:460px}
+body.big-dots .dotrow::before{left:29px;right:29px}
+@media (max-width:420px){body.big-dots .dot{width:50px;height:50px}}
+.btn.ghost[aria-pressed="true"]{border-color:var(--accent);color:var(--accent);font-weight:600}
+.toolrow{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+select.psel{font:inherit;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink)}
+.frm{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:12px 0}
+.frm .full{grid-column:1/-1}
+.frm label{font-size:12px;color:var(--muted);display:block;margin-bottom:4px}
+.frm input,.frm select{width:100%;font:inherit;font-size:14px;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink)}
+.ordergrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:6px;margin-top:10px}
+.ocell{border:1px solid var(--line);border-radius:8px;padding:17px 6px 8px;display:flex;flex-direction:column;align-items:center;gap:1px;background:var(--surface);width:100%;position:relative}
+.ocell.odone{opacity:.4}
+.ocell.ochk{border-color:var(--accent)}
+.ocell.onext{border:2px solid var(--accent)}
+.ocell.odelarm{opacity:1;border:2px solid var(--danger)}
+.omark{position:absolute;top:3px;right:6px;color:var(--accent);font-weight:600;font-size:12px}
+.onum{position:absolute;top:3px;left:6px;color:var(--muted);font-size:10px;font-variant-numeric:tabular-nums}
+.ocat{font-size:11px;color:var(--muted)}
+.ocode{font-size:13.5px;font-weight:600}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script id="appjs">
+(function(){
+'use strict';
+// ─── 설정 ───────────────────────────────────────────────
+// Apps Script 배포 후 받은 웹 앱 URL(…/exec)을 아래에 넣으세요. (비어 있으면 이 기기에만 저장)
+var ENDPOINT='https://script.google.com/macros/s/AKfycbwBD5l6vmrhWPpSHQ6lyNgxUEDRFOC-MI5mdWIaEa_ggctPKbMzZxwEjz5eutaf8-eP/exec';
+// apps-script.gs의 API_KEY와 동일해야 합니다.
+var APIKEY='hxlab-study2-2026';
+// (선택) 구글 시트 문서 URL — 넣으면 관리 화면에 [구글 시트 열기] 버튼이 생깁니다.
+var SHEET_URL='';
+var OBS_SEC=10;      // 시편당 관찰 시간(촉각 집단은 만지는 시간 포함)
+var BREAK_SEC=30;    // 세트 사이 시편 교체 시간
+var LIKERT_MAX=7;
+// 세트(수준) 제시 순서: 'latin6' = 6가지 순열을 참가자 번호 순으로 순환 / 'fixed' = Low→Mid→High 고정
+var SET_ORDER_MODE='latin6';
+var N_PER_GROUP=40;
+// ────────────────────────────────────────────────────────
+
+var LEVELS={Low:['PL7','PL11','PL12'],Mid:['PL6','PL10','PL14'],High:['PL1','PL3','PL9']};
+var PERMS=[['Low','Mid','High'],['Low','High','Mid'],['Mid','Low','High'],['Mid','High','Low'],['High','Low','Mid'],['High','Mid','Low']];
+var POS_LABEL=['왼쪽','가운데','오른쪽'];
+var POS_NUM=['①','②','③'];
+var COND_LABEL={V:'시각',T:'시각+촉각'};
+var COND_KEY={V:'visual',T:'visual+touch'};
+
+// 18문항 (ITEMS[i].rev = 역문항: 분석 시 8-점 역채점)
+var ITEMS=[
+ {c:'환경친화성',q:'이 소재는 환경친화적이다.'},
+ {c:'환경친화성',q:'이 소재의 생산 및 폐기는 환경에 비교적 적은 피해를 준다.'},
+ {c:'환경친화성',q:'이 소재는 다른 소재보다 상대적으로 더 친환경적이다.'},
+ {c:'환경친화성',q:'이 소재는 ‘환경친화적인 소재’라고 평가할 만하다.'},
+ {c:'자연성',q:'이 소재는 자연적으로 느껴진다.'},
+ {c:'자연성',q:'이 소재는 인위적으로 가공된 느낌이 적다.'},
+ {c:'자연성',q:'이 소재는 인공적으로 느껴진다.',rev:true},
+ {c:'사용선호',q:'내가 이 소재를 사용하는 것은 즐거울 것 같다.'},
+ {c:'사용선호',q:'이 소재를 사용하고 싶다.'},
+ {c:'사용선호',q:'이 소재를 편안한 마음으로 사용할 수 있을 것 같다.'},
+ {c:'사용선호',q:'이 소재는 나에게 좋은 느낌을 준다.'},
+ {c:'사용선호',q:'이 소재를 사용하는 것은 나에게 즐거움을 줄 것 같다.'},
+ {c:'품질지각',q:'이 소재는 일관된 품질을 가진 것 같다.'},
+ {c:'품질지각',q:'이 소재는 잘 만들어진 것 같다.'},
+ {c:'품질지각',q:'이 소재는 적절한 수준의 품질을 가진 것 같다.'},
+ {c:'품질지각',q:'이 소재는 마감 품질이 좋지 않을 것 같다.',rev:true},
+ {c:'품질지각',q:'이 소재는 오래 지속되지 않을 것 같다.',rev:true},
+ {c:'품질지각',q:'이 소재는 지속적으로 좋은 성능을 보일 것 같다.'}
+];
+var N_ITEMS=ITEMS.length;
+var TOTAL_TRIALS=9;
+
+function pad2(n){return (n<10?'0':'')+n;}
+var PIDS=[],i0;
+for(i0=1;i0<=N_PER_GROUP;i0++)PIDS.push('V'+pad2(i0));
+for(i0=1;i0<=N_PER_GROUP;i0++)PIDS.push('T'+pad2(i0));
+var TOTAL=PIDS.length*TOTAL_TRIALS;
+function condOf(pid){return pid.charAt(0);}
+
+// ─── 제시 순서 ───
+// 같은 번호의 V·T 참가자는 같은 순서를 받는다(집단 간 순서 통제).
+// 세트 순서: 6가지 순열을 번호 순으로 순환. 세트 안 시편 순서: 3칸 회전(세트마다 오프셋) + 18명마다 방향 반전.
+var ordCache={};
+function ordOf(pid){
+  if(ordCache[pid])return ordCache[pid];
+  var k=parseInt(pid.slice(1),10)-1,perm=SET_ORDER_MODE==='fixed'?PERMS[0]:PERMS[k%6],out=[],t=1;
+  for(var s=0;s<3;s++){
+    var base=LEVELS[perm[s]].slice(),rot=(Math.floor(k/6)+s)%3;
+    var arr=base.slice(rot).concat(base.slice(0,rot));
+    if(Math.floor(k/18)%2===1)arr.reverse();
+    for(var p=0;p<3;p++)out.push({trial:t++,set:s+1,pos:p+1,level:perm[s],material:arr[p]});
+  }
+  ordCache[pid]=out;return out;
+}
+
+// ─── 저장소 ───
+var LS_REC='st2_records_v1',LS_Q='st2_queue_v1',SS_RUN='st2_run_v1',LS_DEV='st2_dev_v1',LS_SET='st2_settings_v1',LS_PAY='st2_pay_v1',LS_AKEY='st2_akey_v1';
+var records={},queue=[],serverAnswered={},serverOk=null,deviceId='',run=null,payInfo=[],adminKey='';
+var settings={test:false,bigText:false,bigDots:false};
+function lsGet(k,d){try{var v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch(e){return d;}}
+function lsSet(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
+records=lsGet(LS_REC,{})||{};queue=lsGet(LS_Q,[])||[];payInfo=lsGet(LS_PAY,[])||[];settings=lsGet(LS_SET,settings)||settings;
+try{adminKey=localStorage.getItem(LS_AKEY)||'';}catch(e){}
+try{deviceId=localStorage.getItem(LS_DEV)||'';if(!deviceId){deviceId='dev-'+Math.random().toString(36).slice(2,8);localStorage.setItem(LS_DEV,deviceId);}}catch(e){deviceId='dev-x';}
+try{run=JSON.parse(sessionStorage.getItem(SS_RUN)||'null');}catch(e){run=null;}
+function saveRecords(){lsSet(LS_REC,records);}
+function saveQueue(){lsSet(LS_Q,queue);}
+function savePay(){lsSet(LS_PAY,payInfo);}
+function saveSettings(){lsSet(LS_SET,settings);}
+function saveRun(){try{if(run)sessionStorage.setItem(SS_RUN,JSON.stringify(run));else sessionStorage.removeItem(SS_RUN);}catch(e){}}
+function applySettings(){
+  document.body.classList.toggle('big-text',!!settings.bigText);
+  document.body.classList.toggle('big-dots',!!settings.bigDots);
+}
+function escHtml(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function z(n){return pad2(n);}
+
+function answeredSet(pid){
+  var s={},k,a=records[pid]||{},b=serverAnswered[pid]||{};
+  for(k in a)s[k]=true;for(k in b)s[k]=true;return s;
+}
+function countOf(pid){return Object.keys(answeredSet(pid)).length;}
+function totalCount(){var n=0;for(var i=0;i<PIDS.length;i++)n+=countOf(PIDS[i]);return n;}
+function nextTrial(pid,after){
+  var s=answeredSet(pid);
+  for(var t=(after||0)+1;t<=TOTAL_TRIALS;t++){if(!s[t])return t;}
+  return 0;
+}
+
+// ─── 서버 통신 ───
+function post(body){
+  if(!body.key)body.key=APIKEY;
+  return fetch(ENDPOINT,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(body),redirect:'follow'})
+    .then(function(r){return r.json();});
+}
+var flushing=false;
+function flush(){
+  if(!ENDPOINT||!queue.length||flushing)return Promise.resolve(false);
+  flushing=true;
+  var batch=queue.slice();
+  return post({records:batch}).then(function(res){
+    flushing=false;
+    if(res&&res.ok){queue=queue.filter(function(q){return batch.indexOf(q)<0;});saveQueue();return true;}
+    return false;
+  },function(){flushing=false;return false;});
+}
+function refresh(){
+  if(!ENDPOINT)return Promise.resolve(false);
+  return fetch(ENDPOINT,{redirect:'follow'}).then(function(r){return r.json();}).then(function(res){
+    if(res&&res.ok){
+      serverAnswered={};
+      for(var pid in res.answered){serverAnswered[pid]={};res.answered[pid].forEach(function(t){serverAnswered[pid][t]=true;});}
+      serverOk=true;return true;
+    }
+    serverOk=false;return false;
+  },function(){serverOk=false;return false;});
+}
+
+// ─── 응답 기록 ───
+function saveRecord(pid,trial,ratings,rateSec){
+  var o=ordOf(pid)[trial-1],now=Date.now();
+  var rec={pid:pid,cond:COND_KEY[condOf(pid)],trial:trial,set:o.set,level:o.level,pos:o.pos,material:o.material,
+    ratings:ratings,rateSec:rateSec,ts:new Date(now).toISOString(),client:deviceId+(settings.test?'-test':'')};
+  (records[pid]=records[pid]||{})[trial]={m:o.material,r:ratings,t:now};
+  queue.push(rec);saveRecords();saveQueue();
+}
+function randRatings(){var r=[];for(var i=0;i<N_ITEMS;i++)r.push(1+Math.floor(Math.random()*LIKERT_MAX));return r;}
+
+// ─── 화면 상태 ───
+var route={v:'home'};
+var timer=null,tok=0,codeTimer=null;
+function clearTimer(){if(timer){clearInterval(timer);timer=null;}tok++;}
+function countdown(ms,onTick,onEnd){
+  clearTimer();var my=tok,end=run.phStart+ms;
+  function tick(){
+    if(my!==tok)return;
+    var left=end-Date.now();
+    if(left<=0){clearTimer();onTick(0);onEnd();return;}
+    onTick(left);
+  }
+  tick();timer=setInterval(tick,200);
+}
+function go(r){route=r;render();window.scrollTo(0,0);}
+function setPhase(ph,trial){
+  run.ph=ph;if(trial)run.trial=trial;run.phStart=Date.now();run.draft=[];
+  for(var i=0;i<N_ITEMS;i++)run.draft.push(null);
+  saveRun();render();window.scrollTo(0,0);
+}
+function startPid(pid){
+  var nt=nextTrial(pid,0);
+  run={pid:pid,trial:nt||TOTAL_TRIALS,ph:'intro',phStart:Date.now(),draft:null};
+  if(!nt)run.ph='done';
+  else if(nt===1)run.ph='intro';
+  else if(ordOf(pid)[nt-1].pos===1)run.ph='break';
+  else run.ph='obs';
+  run.draft=[];for(var i=0;i<N_ITEMS;i++)run.draft.push(null);
+  saveRun();go({v:'run'});
+}
+function leaveRun(){clearTimer();run=null;saveRun();go({v:'home'});}
+
+function render(){
+  clearTimer();
+  if(route.v==='admin')return renderAdmin();
+  if(route.v==='info')return renderInfo();
+  if(route.v==='run'&&run){
+    if(run.ph==='intro')return renderIntro();
+    if(run.ph==='obs')return renderObs();
+    if(run.ph==='rate')return renderRate();
+    if(run.ph==='break')return renderBreak();
+    if(run.ph==='done')return renderDone();
+  }
+  route={v:'home'};renderHome();
+}
+var app=document.getElementById('app');
+
+function bannerHTML(){
+  if(settings.test)return '<div class="banner">테스트 모드 켜짐 — 실제 실험 전에 [관리자 → 화면·테스트 설정]에서 꺼 주세요. 테스트로 넣은 참가자는 초기화로 지울 수 있어요.</div>';
+  if(route.v==='run')return '';
+  if(!ENDPOINT)return '<div class="banner">구글 시트 연결 전 — index.html 상단의 ENDPOINT에 Apps Script 웹 앱 URL을 넣어야 서버 저장이 됩니다. 지금은 이 기기에만 저장돼요.</div>';
+  if(queue.length)return '<div class="banner">서버 전송 대기 '+queue.length+'건 — 응답은 이 기기에 보관 중이고, 연결되면 자동으로 전송됩니다.</div>';
+  if(serverOk===false)return '<div class="banner">구글 시트 연결 확인 실패 — 인터넷/배포 설정을 확인하세요. 응답은 이 기기에 저장되고 있습니다.</div>';
+  return '';
+}
+
+// ─── 홈 ───
+function groupGrid(prefix){
+  var doneN=0,partN=0,cells='';
+  for(var i=0;i<PIDS.length;i++){
+    var pid=PIDS[i];if(pid.charAt(0)!==prefix)continue;
+    var c=countOf(pid),cls='pbtn',st='시작 전';
+    if(c>=TOTAL_TRIALS){cls+=' done';st='완료';doneN++;}
+    else if(c>0){cls+=' part';st=c+' / '+TOTAL_TRIALS;partN++;}
+    cells+='<button class="'+cls+'" data-act="pick" data-pid="'+pid+'"><span class="pid mono">'+pid+'</span><span class="st">'+st+'</span></button>';
+  }
+  return '<div class="sect"><p class="sectlab">'+COND_LABEL[prefix]+' 집단 ('+prefix+') — 완료 '+doneN+' · 진행 중 '+partN+'</p><div class="pgrid">'+cells+'</div></div>';
+}
+function renderHome(){
+  app.innerHTML='<div class="wrap">'+bannerHTML()
+    +'<p class="eyebrow">2차 실험 · 시각 vs 시각+촉각</p>'
+    +'<h1>재생 플라스틱 소재 평가</h1>'
+    +'<p class="sub">참가자를 선택하면 지정된 순서로 평가가 진행됩니다. V = 시각 집단, T = 시각+촉각 집단.</p>'
+    +'<div class="stats"><span>누적 응답 <b>'+totalCount()+'</b> / '+TOTAL+'</span></div>'
+    +groupGrid('V')+groupGrid('T')
+    +'<div class="foot"><button class="btn ghost" data-act="goinfo">인적사항만 따로 입력</button></div>'
+    +'</div>';
+}
+
+// ─── 시편 코드 칩 (참가자에게는 가림, 진행자가 누르면 4초만 표시) ───
+function codeChipHTML(trial){
+  return '<button class="codechip masked" data-act="showcode" data-trial="'+trial+'">시편 코드 확인 (진행자용)</button>';
+}
+function showCode(btn,trial){
+  var o=ordOf(run.pid),s=o[trial-1].set,list=[];
+  for(var i=0;i<o.length;i++){if(o[i].set===s)list.push(POS_LABEL[o[i].pos-1]+' '+o[i].material);}
+  btn.classList.remove('masked');btn.style.fontSize='18px';btn.textContent=list.join(' · ');
+  if(codeTimer)clearTimeout(codeTimer);
+  codeTimer=setTimeout(function(){
+    if(!btn.isConnected)return;
+    btn.classList.add('masked');btn.style.fontSize='';btn.textContent='시편 코드 확인 (진행자용)';
+  },4000);
+}
+function metaLine(){
+  var o=ordOf(run.pid)[run.trial-1];
+  return '<p class="mono" style="font-size:13.5px;color:var(--muted);opacity:.8;margin-top:8px">'+run.pid+' · 시편 '+run.trial+' / '+TOTAL_TRIALS+' (세트 '+o.set+')</p>';
+}
+
+// ─── 안내 ───
+function touchGuideHTML(){
+  return condOf(run.pid)==='T'
+    ?'<li><b>시각+촉각</b> — 시편을 눈으로 보면서 <b>손가락·손바닥으로 표면만</b> 만져 보세요.</li>'
+     +'<li style="color:var(--danger)">두드리기·구부리기·들어보기는 하지 마세요.</li>'
+    :'<li><b>시각</b> — 시편을 눈으로만 관찰해 주세요. 시편에 손을 대지 마세요.</li>';
+}
+function renderIntro(){
+  app.innerHTML='<div class="wrap center vwrap">'+bannerHTML()
+    +'<p class="eyebrow">재생 플라스틱 소재 평가</p>'
+    +'<h1 style="font-size:24px">평가를 시작합니다</h1>'
+    +'<div class="card" style="text-align:left;margin-top:18px"><ul class="guide">'
+    +'<li>시편은 3개씩 3세트, 총 <b>9개</b>입니다.</li>'
+    +'<li>시편마다 <b>'+OBS_SEC+'초</b> 관찰한 뒤, 18개 문항에 응답합니다 (1~7점).</li>'
+    +touchGuideHTML()
+    +'<li>프레임의 시편을 <b>왼쪽부터 ①②③</b> 순서로 평가합니다.</li>'
+    +'<li>세트가 끝나면 진행자가 시편을 교체합니다. 정답은 없으니 느낀 대로 응답해 주세요.</li>'
+    +'</ul></div>'
+    +'<div class="btnrow" style="margin-top:28px"><button class="btn wide" data-act="begin">첫 세트 시작</button></div>'
+    +'<div style="margin-top:14px">'+codeChipHTML(run.trial)+'</div>'
+    +'<p style="margin-top:40px"><button class="backlink" data-act="leave">세션 나가기</button></p>'
+    +metaLine()+'</div>';
+}
+
+// ─── 관찰 ───
+function renderObs(){
+  var o=ordOf(run.pid)[run.trial-1],touch=condOf(run.pid)==='T';
+  app.innerHTML='<div class="wrap center vwrap">'+bannerHTML()
+    +'<p class="eyebrow">세트 '+o.set+' / 3 · 시편 '+run.trial+' / '+TOTAL_TRIALS+'</p>'
+    +'<h1 style="font-size:26px;margin-top:14px">'+POS_NUM[o.pos-1]+' '+POS_LABEL[o.pos-1]+' 시편을 관찰해 주세요</h1>'
+    +'<p class="sub" style="font-size:16px;margin-top:14px">'+(touch?'눈으로 보면서 <b>손가락·손바닥으로 표면만</b> 만져 보세요.<br><span style="color:var(--danger)">두드리기·구부리기·들어보기는 하지 마세요.</span>':'눈으로만 관찰해 주세요.<br>시편에 손을 대지 마세요.')+'</p>'
+    +'<div class="breaktime mono" id="cd">'+OBS_SEC+'</div>'
+    +'<div class="bar" style="max-width:320px;margin:18px auto 0"><i id="cdbar" style="width:0%"></i></div>'
+    +(settings.test?'<div class="btnrow" style="margin-top:40px"><button class="btn ghost wide" data-act="skip">관찰 건너뛰기 (테스트)</button></div>':'')
+    +'<p style="margin-top:48px"><button class="backlink" data-act="leave">세션 나가기</button></p>'
+    +metaLine()+'</div>';
+  var cd=document.getElementById('cd'),bar=document.getElementById('cdbar');
+  countdown(OBS_SEC*1000,function(left){
+    cd.textContent=Math.ceil(left/1000);
+    bar.style.width=Math.round((1-left/(OBS_SEC*1000))*100)+'%';
+  },function(){setPhase('rate');});
+}
+
+// ─── 평가 ───
+function itemRowsHTML(){
+  var rows='<div class="items">';
+  for(var i=0;i<N_ITEMS;i++){
+    var dots='';
+    for(var v=1;v<=LIKERT_MAX;v++){
+      dots+='<button class="dot" data-act="dot" data-item="'+i+'" data-val="'+v+'" aria-pressed="'+(run.draft[i]===v?'true':'false')+'">'+v+'</button>';
+    }
+    rows+='<div class="item" data-row="'+i+'"><p class="q"><span class="mono" style="color:var(--muted);font-size:14px;margin-right:6px">'+(i+1)+'</span>'+ITEMS[i].q+'</p>'
+      +'<div class="anchors"><span>전혀 그렇지 않다</span><span>매우 그렇다</span></div>'
+      +'<div class="dots dots7"><div class="dotrow">'+dots+'</div></div></div>';
+  }
+  return rows+'</div>';
+}
+function answeredN(){var n=0;for(var i=0;i<N_ITEMS;i++){if(run.draft[i]!=null)n++;}return n;}
+function renderRate(){
+  var o=ordOf(run.pid)[run.trial-1],last=!nextTrial(run.pid,run.trial);
+  app.innerHTML='<div class="wrap">'
+    +'<div class="topbar"><div class="topline"><span class="mono">'+run.pid+' · 세트 '+o.set+' / 3</span><span>시편 <b>'+run.trial+'</b> / '+TOTAL_TRIALS+' · 응답 <b id="ansn">'+answeredN()+'</b> / '+N_ITEMS+'</span></div>'
+    +'<div class="bar"><i id="ansbar" style="width:'+Math.round(countOf(run.pid)/TOTAL_TRIALS*100)+'%"></i></div></div>'
+    +bannerHTML()
+    +'<p class="hint"><b>'+POS_NUM[o.pos-1]+' '+POS_LABEL[o.pos-1]+' 시편</b>에 대해, 각 문항에 얼마나 동의하는지 응답해 주세요.</p>'
+    +itemRowsHTML()
+    +'<p class="missnote" id="missnote">아직 응답하지 않은 문항이 있습니다.</p>'
+    +(settings.test?'<div class="toolrow"><button class="btn ghost" data-act="rand">랜덤 입력 (R)</button><button class="btn ghost" data-act="stepauto">랜덤+저장 (Space)</button></div>':'')
+    +'<div class="btnrow"><button class="btn wide" data-act="submit">'+(last?'평가 완료 · 저장':'저장하고 계속')+'</button></div>'
+    +'</div>';
+}
+function setDot(i,v){
+  run.draft[i]=v;saveRun();
+  var row=app.querySelector('[data-row="'+i+'"]');
+  if(row){
+    row.classList.remove('miss');
+    var bs=row.querySelectorAll('.dot');
+    for(var k=0;k<bs.length;k++)bs[k].setAttribute('aria-pressed',String(Number(bs[k].getAttribute('data-val'))===v));
+  }
+  var n=document.getElementById('ansn');if(n)n.textContent=answeredN();
+}
+function fillRandom(){var r=randRatings();for(var i=0;i<N_ITEMS;i++)setDot(i,r[i]);}
+function submitRate(){
+  var miss=-1;
+  for(var i=0;i<N_ITEMS;i++){
+    var row=app.querySelector('[data-row="'+i+'"]');
+    if(run.draft[i]==null){if(miss<0)miss=i;if(row)row.classList.add('miss');}
+  }
+  if(miss>=0){
+    document.getElementById('missnote').classList.add('show');
+    var r=app.querySelector('[data-row="'+miss+'"]');
+    if(r&&r.scrollIntoView)r.scrollIntoView({block:'center',behavior:'smooth'});
+    return;
+  }
+  var sec=Math.round((Date.now()-run.phStart)/100)/10;
+  var pid=run.pid,trial=run.trial,cur=ordOf(pid)[trial-1];
+  saveRecord(pid,trial,run.draft.slice(),sec);
+  flush().then(function(){refresh().then(function(){if(route.v==='admin'||route.v==='home')render();});});
+  var nt=nextTrial(pid,trial);
+  if(!nt){setPhase('done');return;}
+  if(ordOf(pid)[nt-1].set!==cur.set)setPhase('break',nt);
+  else setPhase('obs',nt);
+}
+
+// ─── 세트 교체 휴식 ───
+function renderBreak(){
+  var o=ordOf(run.pid)[run.trial-1];
+  app.innerHTML='<div class="wrap center vwrap">'+bannerHTML()
+    +'<p class="eyebrow">시편 교체</p>'
+    +'<h1 style="font-size:25px;font-weight:600;line-height:1.55;margin-top:14px">세트 '+o.set+' 준비 중입니다<br>잠시 기다려 주세요</h1>'
+    +'<div class="breaktime mono" id="cd">'+BREAK_SEC+'</div>'
+    +'<div class="btnrow" style="margin-top:36px"><button class="btn wide" id="nextset" data-act="begin" disabled>세트 '+o.set+' 시작</button></div>'
+    +'<div style="margin-top:14px">'+codeChipHTML(run.trial)+'</div>'
+    +(settings.test?'<p class="hint">테스트 모드: 아래 버튼으로 대기를 생략할 수 있습니다.</p><button class="btn ghost" data-act="skip">대기 건너뛰기</button>':'')
+    +'<p style="margin-top:40px"><button class="backlink" data-act="leave">세션 나가기</button></p>'
+    +metaLine()+'</div>';
+  var cd=document.getElementById('cd'),btn=document.getElementById('nextset');
+  countdown(BREAK_SEC*1000,function(left){cd.textContent=Math.ceil(left/1000);},function(){
+    cd.textContent='0';btn.disabled=false;
+  });
+}
+
+function renderDone(){
+  app.innerHTML='<div class="wrap center vwrap">'+bannerHTML()
+    +'<div class="card" style="padding:36px 24px"><div class="donemark">✓</div>'
+    +'<h1 style="font-size:22px">'+run.pid+' 평가 종료</h1>'
+    +'<p class="sub">시편 9개 평가가 모두 기록되었습니다.<br>참여해 주셔서 감사합니다.</p></div>'
+    +'<div class="btnrow"><button class="btn wide" data-act="leave">참가자 선택으로</button>'
+    +'<button class="btn ghost wide" data-act="goinfo-run">이 참가자 인적사항 입력</button></div></div>';
+}
+
+// ─── 인적사항 ───
+function digits(s){return String(s==null?'':s).replace(/[^0-9]/g,'');}
+// 항상 '문자열'로 다룬다. 앞자리 0이 사라지지 않도록 하이픈 형식으로 정규화.
+function fmtRRN(s){var d=digits(s).slice(0,13);return d.length>6?d.slice(0,6)+'-'+d.slice(6):d;}
+function fmtPhone(s){
+  var d=digits(s);if(!d)return '';
+  if(d.slice(0,2)==='02')return d.length>9?d.slice(0,2)+'-'+d.slice(2,6)+'-'+d.slice(6,10):d.slice(0,2)+'-'+d.slice(2,5)+'-'+d.slice(5,9);
+  if(d.length>10)return d.slice(0,3)+'-'+d.slice(3,7)+'-'+d.slice(7,11);
+  return d.slice(0,3)+'-'+d.slice(3,6)+'-'+d.slice(6,10);
+}
+function maskRRN(s){var d=digits(s);return d.length>=7?d.slice(0,6)+'-'+d.charAt(6)+'******':String(s||'');}
+var infoSaved=false,pendingInfoPid=null;
+function infoFormHTML(){
+  var d=new Date(),iso=d.getFullYear()+'-'+z(d.getMonth()+1)+'-'+z(d.getDate());
+  var opts='<option value="">미지정</option>'+PIDS.map(function(p){return '<option value="'+p+'"'+(p===pendingInfoPid?' selected':'')+'>'+p+' ('+COND_LABEL[condOf(p)]+')</option>';}).join('');
+  return '<p class="sectlab">본인 정보</p><div class="frm">'
+    +'<div><label>성명 *</label><input id="pi_name" autocomplete="off"></div>'
+    +'<div><label>주민등록번호</label><input id="pi_rrn" type="text" inputmode="numeric" autocomplete="off" maxlength="14" placeholder="000000-0000000"></div>'
+    +'<div><label>연락처</label><input id="pi_phone" type="text" inputmode="tel" autocomplete="off" maxlength="13" placeholder="010-0000-0000"></div>'
+    +'<div><label>직위</label><input id="pi_pos" placeholder="학부생, 대학원생 등"></div>'
+    +'<div class="full"><label>소속</label><input id="pi_org" placeholder="학교/기관, 학과"></div>'
+    +'<div class="full"><label>주소</label><input id="pi_addr" placeholder="도로명 주소"></div></div>'
+    +'<p class="sectlab" style="margin-top:18px">참여비 입금 계좌</p><div class="frm">'
+    +'<div><label>은행</label><input id="pi_bank" placeholder="예: 토스뱅크"></div>'
+    +'<div><label>예금주</label><input id="pi_holder"></div>'
+    +'<div class="full"><label>계좌번호</label><input id="pi_acct" type="text" inputmode="numeric" autocomplete="off" placeholder="숫자만 입력"></div></div>'
+    +'<p class="sectlab" style="margin-top:18px">진행자 기재란</p><div class="frm">'
+    +'<div><label>참가자 번호</label><select id="pi_pid">'+opts+'</select></div>'
+    +'<div><label>청구금액</label><input id="pi_amt" type="text" inputmode="numeric" value="10000"></div>'
+    +'<div><label>활용일자</label><input type="date" id="pi_dt" value="'+iso+'"></div></div>';
+}
+function renderInfo(){
+  if(infoSaved){
+    app.innerHTML='<div class="wrap center" style="padding-top:80px"><div class="card" style="padding:36px 24px"><div class="donemark">✓</div>'
+      +'<h1 style="font-size:22px">저장되었습니다</h1><p class="sub">감사합니다. 진행자에게 알려주세요.</p></div>'
+      +'<div class="btnrow">'+(pendingInfoPid&&run?'<button class="btn wide" data-act="info-back">실험 화면으로 돌아가기 ('+pendingInfoPid+')</button>':'')
+      +'<button class="btn ghost wide" data-act="info-new">다음 참가자 입력</button></div></div>';
+    return;
+  }
+  app.innerHTML='<div class="wrap"><p class="eyebrow">연구 참여 안내</p><h1>참여자 정보 입력</h1>'
+    +'<p class="sub">연구 참여비(수당) 지급을 위해 필요한 정보입니다.</p>'
+    +'<div class="card" style="margin-top:16px"><p class="sectlab">개인정보 수집·이용 안내</p><ul class="guide" style="font-size:13.5px;margin-top:10px">'
+    +'<li><b>수집 목적</b> — 대학 산학협력단 연구과제 수행에 따른 연구 참여비(수당) 지급, 소득 원천징수 신고 및 증빙자료 제출</li>'
+    +'<li><b>수집 항목</b> — 성명, 주민등록번호, 연락처, 소속, 직위, 주소, 입금 계좌정보</li>'
+    +'<li><b>법적 근거</b> — 개인정보보호법 제15조(수집·이용)·제24조(고유식별정보) 및 소득세법상 원천징수 의무에 따른 수집입니다</li>'
+    +'<li><b>보유 및 이용 기간</b> — 참여비 지급 처리와 관련 증빙 제출까지이며, 목적 달성 후 지체 없이 파기됩니다</li>'
+    +'<li><b>이용 범위</b> — 위 정보는 참여비 지급 외의 목적으로 사용되지 않으며, 연구 응답 데이터(익명)와 분리되어 보관됩니다</li>'
+    +'<li>동의를 거부하실 수 있으나, 이 경우 참여비 지급이 어려울 수 있습니다</li></ul></div>'
+    +'<div class="card" style="margin-top:14px">'+infoFormHTML()
+    +'<label style="display:flex;gap:10px;align-items:flex-start;font-size:14px;margin-top:18px;cursor:pointer">'
+    +'<input type="checkbox" id="pi_agree" style="width:19px;height:19px;margin-top:2px;accent-color:var(--accent)">'
+    +'<span>위 개인정보 수집·이용 안내를 확인하였으며, 이에 동의합니다.</span></label>'
+    +'<p class="hint" id="infomsg" style="color:var(--danger)"></p>'
+    +'<div class="btnrow"><button class="btn wide" data-act="info-save">저장</button></div></div></div>';
+}
+function gv(id){var e=document.getElementById(id);return e?String(e.value||'').trim():'';}
+function saveInfo(){
+  var msg=document.getElementById('infomsg');
+  var name=gv('pi_name'),rrnD=digits(gv('pi_rrn')),acctRaw=gv('pi_acct');
+  if(!name){msg.textContent='성명을 입력해 주세요.';return;}
+  if(rrnD&&rrnD.length!==13){msg.textContent='주민등록번호는 13자리여야 합니다 (현재 '+rrnD.length+'자리).';return;}
+  if(!document.getElementById('pi_agree').checked){msg.textContent='개인정보 수집·이용 안내에 동의해 주세요.';return;}
+  var dt=gv('pi_dt');
+  payInfo.push({id:'pi-'+Date.now()+'-'+Math.random().toString(36).slice(2,7),synced:false,client:deviceId,
+    pid:gv('pi_pid'),name:name,rrn:fmtRRN(rrnD),org:gv('pi_org'),pos:gv('pi_pos'),dt:dt?dt.split('-').join('.'):'',
+    phone:fmtPhone(gv('pi_phone')),addr:gv('pi_addr'),amt:gv('pi_amt'),bank:gv('pi_bank'),holder:gv('pi_holder'),
+    acct:acctRaw.replace(/\s+/g,''),agree:'Y',agreedAt:new Date().toISOString(),t:Date.now()});
+  savePay();infoSaved=true;render();window.scrollTo(0,0);syncPay();
+}
+// 인적사항 서버 동기화 / 열람
+var serverPay=null,payFetchState=null;
+function fetchPayList(){
+  if(!ENDPOINT||!adminKey)return Promise.resolve(false);
+  payFetchState='loading';
+  return post({action:'listinfo',key:adminKey}).then(function(res){
+    if(res&&res.ok){
+      serverPay=res.list||[];payFetchState='ok';
+      var ids={};serverPay.forEach(function(p){ids[p.id]=true;});
+      var ch=false;payInfo.forEach(function(p){if(p.id&&ids[p.id]&&!p.synced){p.synced=true;ch=true;}});
+      if(ch)savePay();
+      if(route.v==='admin')render();return true;
+    }
+    payFetchState=(res&&res.error==='bad_admin_key')?'badkey':'err';if(route.v==='admin')render();return false;
+  },function(){payFetchState='err';if(route.v==='admin')render();return false;});
+}
+function syncPay(){
+  if(!ENDPOINT)return Promise.resolve(false);
+  var chain=Promise.resolve();
+  payInfo.filter(function(p){return !p.synced;}).forEach(function(p){
+    chain=chain.then(function(){return post({action:'addinfo',info:p}).then(function(res){if(res&&res.ok){p.synced=true;savePay();}},function(){});});
+  });
+  return chain.then(function(){return adminKey?fetchPayList():true;});
+}
+function mergedPay(){
+  if(serverPay===null)return payInfo.slice();
+  var ids={};serverPay.forEach(function(p){ids[p.id]=true;});
+  return serverPay.slice().concat(payInfo.filter(function(p){return !p.synced&&!ids[p.id];}));
+}
+function payTableHTML(){
+  var list=mergedPay();
+  if(!list.length)return '<p class="hint">저장된 인적사항이 없습니다.</p>';
+  var r='';
+  list.forEach(function(p,i){
+    var st=p.synced===false?'<span class="tag">전송 대기</span>':'<span class="tag done">저장됨</span>';
+    r+='<tr><td>'+(i+1)+'</td><td class="mono">'+escHtml(p.pid||'—')+'</td><td>'+escHtml(p.name)+'</td><td class="mono">'+escHtml(maskRRN(p.rrn))+'</td><td class="mono">'+escHtml(p.phone)+'</td><td>'+escHtml(p.amt)+'</td><td>'+st+'</td><td><button class="del" data-act="pay-del" data-id="'+escHtml(p.id)+'">삭제</button></td></tr>';
+  });
+  return '<div class="tscroll"><table><thead><tr><th>#</th><th>참가자</th><th>성명</th><th>주민번호</th><th>연락처</th><th>청구금액</th><th>상태</th><th></th></tr></thead><tbody>'+r+'</tbody></table></div>';
+}
+function payCSV(mask){
+  function esc(s){return '"'+String(s==null?'':s).replace(/"/g,'""')+'"';}
+  // 엑셀이 앞자리 0을 지우거나 지수 표기로 바꾸지 못하도록 텍스트로 강제 (주민번호·연락처·계좌·일자)
+  function esct(s){return '="'+String(s==null?'':s).replace(/"/g,'""')+'"';}
+  var list=mergedPay(),lines;
+  if(mask){
+    lines=['연번,성명,주민번호,소속,직위,활용일시,연락처,주소,청구금액,계좌정보'];
+    list.forEach(function(p,i){
+      var acct=[p.bank,p.holder,p.acct].filter(Boolean).join(', ');
+      lines.push([i+1,esc(p.name),esct(maskRRN(p.rrn)),esc(p.org),esc(p.pos),esct(p.dt),esct(p.phone),esc(p.addr),esc(p.amt),esc(acct)].join(','));
+    });
+  }else{
+    lines=['연번,성명,주민등록번호,소속,직위,활용일시,연락처,주소,청구금액,예금주,은행,계좌번호'];
+    list.forEach(function(p,i){
+      lines.push([i+1,esc(p.name),esct(p.rrn),esc(p.org),esc(p.pos),esct(p.dt),esct(p.phone),esc(p.addr),esc(p.amt),esc(p.holder),esc(p.bank),esct(p.acct)].join(','));
+    });
+  }
+  return '﻿'+lines.join('\r\n');
+}
+function blobSave(name,data,type){
+  var b=new Blob([data],{type:type||'text/csv;charset=utf-8'}),a=document.createElement('a');
+  a.href=URL.createObjectURL(b);a.download=name;document.body.appendChild(a);a.click();
+  setTimeout(function(){URL.revokeObjectURL(a.href);a.remove();},500);
+}
+function buildCSV(){
+  function esct(s){return '="'+s+'"';}
+  var head=['participant','condition','trial','set','level','position','material'];
+  for(var i=0;i<N_ITEMS;i++)head.push('q'+pad2(i+1)+(ITEMS[i].rev?'_rev':''));
+  head=head.concat(['rate_sec','timestamp']);
+  var lines=[head.join(',')];
+  PIDS.forEach(function(pid){
+    var rs=records[pid]||{};
+    Object.keys(rs).map(Number).sort(function(a,b){return a-b;}).forEach(function(t){
+      var o=ordOf(pid)[t-1],rec=rs[t];
+      lines.push([pid,COND_KEY[condOf(pid)],t,o.set,o.level,o.pos,o.material].concat(rec.r).concat(['',new Date(rec.t).toISOString()]).join(','));
+    });
+  });
+  return '﻿'+lines.join('\r\n');
+}
+
+// ─── 관리자 ───
+var adminTableOpen=false,orderShown=null,armed=null;
+function orderBoxHTML(pid){
+  var o=ordOf(pid),ans=answeredSet(pid),nxt=nextTrial(pid,0),rows='';
+  o.forEach(function(x){
+    var d=!!ans[x.trial];
+    rows+='<tr'+(d?' style="opacity:.45"':'')+'><td>'+x.trial+(x.trial===nxt?' ◀ 다음':'')+'</td><td>세트 '+x.set+'</td><td>'+x.level+'</td><td>'+POS_NUM[x.pos-1]+' '+POS_LABEL[x.pos-1]+'</td><td class="mono"><b>'+x.material+'</b></td><td>'+(d?'✓ 저장됨':'')+'</td>'
+      +'<td>'+(d?'<button class="del'+(armed==='t'+pid+x.trial?' arm':'')+'" data-act="deltrial" data-pid="'+pid+'" data-trial="'+x.trial+'">'+(armed==='t'+pid+x.trial?'한 번 더 눌러 삭제':'이 시편 기록 삭제')+'</button>':'')+'</td></tr>';
+  });
+  return '<p class="hint" style="margin-top:12px"><b>'+pid+'</b> ('+COND_LABEL[condOf(pid)]+') — 프레임에 <b>왼쪽부터 ①②③ 순서</b>로 놓습니다. 세트 사이 교체 30초.</p>'
+    +'<div class="tscroll"><table><thead><tr><th>시행</th><th>세트</th><th>수준</th><th>위치</th><th>시편</th><th>상태</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div>';
+}
+function renderAdmin(){
+  var rows='',doneN=0,partN=0;
+  PIDS.forEach(function(pid){
+    var c=countOf(pid);
+    if(c>=TOTAL_TRIALS)doneN++;else if(c>0)partN++;
+    var tag=c>=TOTAL_TRIALS?'<span class="tag done">완료</span>':(c>0?'<span class="tag part">진행 중</span>':'<span class="tag">시작 전</span>');
+    rows+='<tr><td class="mono">'+pid+'</td><td>'+COND_LABEL[condOf(pid)]+'</td><td>'+tag+'</td><td>'+c+' / '+TOTAL_TRIALS+'</td>'
+      +'<td>'+(c>0?'<button class="del'+(armed==='p'+pid?' arm':'')+'" data-act="del" data-pid="'+pid+'">'+(armed==='p'+pid?'한 번 더 눌러 초기화':'초기화')+'</button>':'')+'</td></tr>';
+  });
+  var sheetBtn=SHEET_URL?'<a class="btn" href="'+SHEET_URL+'" target="_blank" rel="noopener">구글 시트 열기</a>':'';
+  var syncLabel=!ENDPOINT?'시트 미연결 (이 기기에만 저장)':(serverOk===true?'시트 연결됨':(serverOk===false?'시트 연결 안 됨':'확인 중'));
+  var pidOpts=PIDS.map(function(p){return '<option value="'+p+'"'+(p===orderShown?' selected':'')+'>'+p+'</option>';}).join('');
+  app.innerHTML='<div class="wrap wide">'+bannerHTML()
+    +'<button class="backlink" data-act="home">← 홈으로</button>'
+    +'<div class="admhead"><div><p class="eyebrow">기록 관리 · '+syncLabel+'</p><h1 style="font-size:22px">응답 현황 <span class="mono" style="font-weight:500;font-size:16px;color:var(--muted)">'+totalCount()+' / '+TOTAL+'</span></h1></div>'
+    +'<div style="display:flex;gap:8px;flex-wrap:wrap">'+sheetBtn
+    +'<a class="btn ghost" href="#info" target="_blank" rel="noopener">인적사항 입력 화면</a>'
+    +'<button class="btn ghost" data-act="refresh">새로고침</button>'
+    +'<button class="btn ghost" data-act="retry">대기분 전송'+(queue.length?(' ('+queue.length+')'):'')+'</button>'
+    +'<button class="btn ghost" data-act="csv">CSV (이 기기 기록)</button></div></div>'
+    +'<div class="card"><p class="sectlab">제시 순서표 (진행자용)</p>'
+    +'<div class="toolrow" style="align-items:center;margin-top:4px"><select class="psel" id="orderpid">'+pidOpts+'</select><button class="btn ghost" data-act="showorder">순서 보기</button></div>'
+    +'<div id="orderbox">'+(orderShown?orderBoxHTML(orderShown):'')+'</div></div>'
+    +'<div class="card" style="margin-top:16px"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">'
+    +'<p class="sectlab" style="margin:0">응답 현황 — 완료 '+doneN+' · 진행 중 '+partN+' · 시작 전 '+(PIDS.length-doneN-partN)+'</p>'
+    +'<button class="btn ghost" style="min-height:36px;padding:6px 14px" data-act="tbl-toggle">'+(adminTableOpen?'접기':'펼치기')+'</button></div>'
+    +(adminTableOpen?'<div class="tscroll" style="margin-top:10px"><table><thead><tr><th>참가자</th><th>집단</th><th>상태</th><th>응답</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div>':'')
+    +'</div>'
+    +'<div class="card" style="margin-top:16px"><p class="sectlab">참여비 지급 정보 (관리자 키를 입력한 기기끼리 공유)</p>'
+    +(adminKey
+      ?(payTableHTML()
+        +'<div class="toolrow"><button class="btn ghost" data-act="pay-refresh">목록 새로고침'+(payFetchState==='loading'?' …':'')+'</button>'
+        +(mergedPay().length?'<button class="btn ghost" data-act="pay-csv-full">CSV — 수기입력용 (주민번호 전체)</button><button class="btn ghost" data-act="pay-csv-mask">CSV — 증빙용 (주민번호 마스킹)</button><button class="btn ghost" data-act="pay-json">JSON 백업</button>':'')
+        +(mergedPay().length?'<button class="btn ghost'+(armed==='payclear'?' arm':'')+'" data-act="pay-clear" style="color:var(--danger)">'+(armed==='payclear'?'한 번 더 눌러 전체 삭제':'전체 삭제')+'</button>':'')+'</div>'
+        +(payFetchState==='badkey'?'<p class="hint" style="color:var(--danger)">관리자 키가 올바르지 않습니다. <button class="backlink" data-act="akey-reset" style="margin:0">키 다시 입력</button></p>':'')
+        +'<p class="hint">주민번호·연락처·계좌번호는 구글 시트의 텍스트 서식 열에 저장되어 앞자리 0이 보존됩니다. CSV는 엑셀에서도 0이 유지되도록 텍스트로 내보냅니다. 청구 처리 후 [전체 삭제]를 권장합니다.</p>')
+      :('<p class="hint">인적사항 <b>입력·전송</b>은 키 없이 어느 기기에서나 됩니다. <b>목록 열람</b>은 관리자 키를 입력한 기기에서만 가능합니다 (apps-script.gs의 ADMIN_KEY 값).</p>'
+        +'<div class="toolrow" style="align-items:center"><input class="psel" id="akey_in" type="password" placeholder="관리자 키" style="min-width:200px"><button class="btn" data-act="akey-save">연결</button></div>'))
+    +'</div>'
+    +'<div class="card" style="margin-top:16px"><p class="sectlab">화면 · 테스트 설정</p><div class="toolrow">'
+    +'<button class="btn ghost" data-act="tg-test" aria-pressed="'+settings.test+'">테스트 모드 '+(settings.test?'켜짐':'꺼짐')+'</button>'
+    +'<button class="btn ghost" data-act="tg-text" aria-pressed="'+settings.bigText+'">큰 글자 '+(settings.bigText?'켜짐':'꺼짐')+'</button>'
+    +'<button class="btn ghost" data-act="tg-dots" aria-pressed="'+settings.bigDots+'">큰 응답 버튼 '+(settings.bigDots?'켜짐':'꺼짐')+'</button></div>'
+    +(settings.test?'<p class="hint">테스트 모드: 관찰·교체 대기 건너뛰기 버튼, 평가 화면의 랜덤 입력(R 키)·랜덤+저장(Space)이 생깁니다. 테스트 후 해당 참가자를 초기화하고 모드를 꺼 주세요.</p>':'')
+    +'</div>'
+    +'<div class="note"><b>데이터 원본은 구글 시트입니다.</b> 분석용 전체 데이터는 시트에서 파일 → 다운로드 → Excel(.xlsx)로 받으세요. 역문항은 7번·16번·17번입니다(8−점수로 역채점).</div>'
+    +'<div class="note"><b>제시 순서</b> — 세트(Low/Mid/High) 순서는 6가지 순열을 참가자 번호 순으로 순환하고, 세트 안 시편 순서는 회전·반전으로 균형을 맞춥니다. V와 T의 같은 번호는 같은 순서입니다.</div>'
+    +'<div class="note">참가자 초기화는 구글 시트와 이 기기에서 해당 참가자의 응답을 모두 삭제합니다. 버튼을 두 번 눌러야 실행됩니다.</div>'
+    +'</div>';
+}
+
+// ─── 이벤트 ───
+function arm(key){armed=key;setTimeout(function(){if(armed===key){armed=null;if(route.v==='admin')render();}},4000);render();}
+app.addEventListener('click',function(e){
+  var b=e.target.closest?e.target.closest('[data-act]'):null;if(!b)return;
+  var act=b.getAttribute('data-act');
+  if(act==='pick'){startPid(b.getAttribute('data-pid'));}
+  else if(act==='goinfo'){infoSaved=false;pendingInfoPid=null;go({v:'info'});}
+  else if(act==='goinfo-run'){infoSaved=false;pendingInfoPid=run?run.pid:null;go({v:'info'});}
+  else if(act==='leave'){leaveRun();}
+  else if(act==='showcode'){showCode(b,Number(b.getAttribute('data-trial')));}
+  else if(act==='begin'){setPhase('obs');}
+  else if(act==='skip'){if(run.ph==='obs')setPhase('rate');else setPhase('obs');}
+  else if(act==='dot'){setDot(Number(b.getAttribute('data-item')),Number(b.getAttribute('data-val')));}
+  else if(act==='submit'){submitRate();}
+  else if(act==='rand'){fillRandom();}
+  else if(act==='stepauto'){fillRandom();submitRate();}
+  else if(act==='info-save'){saveInfo();}
+  else if(act==='info-new'){infoSaved=false;pendingInfoPid=null;render();window.scrollTo(0,0);}
+  else if(act==='info-back'){infoSaved=false;history.replaceState(null,'',location.pathname);route={v:'run'};render();}
+  else if(act==='home'){history.replaceState(null,'',location.pathname);go({v:'home'});refresh().then(render);}
+  else if(act==='refresh'){refresh().then(render);}
+  else if(act==='retry'){flush().then(function(){return refresh();}).then(render);}
+  else if(act==='csv'){blobSave('study2_responses_local.csv',buildCSV());}
+  else if(act==='tbl-toggle'){adminTableOpen=!adminTableOpen;render();}
+  else if(act==='showorder'){orderShown=document.getElementById('orderpid').value;render();}
+  else if(act==='del'){
+    var pid=b.getAttribute('data-pid');
+    if(armed!=='p'+pid){arm('p'+pid);return;}
+    armed=null;delete records[pid];saveRecords();
+    queue=queue.filter(function(q){return q.pid!==pid;});saveQueue();
+    delete serverAnswered[pid];
+    if(ENDPOINT)post({action:'reset',pid:pid}).then(function(){return refresh();}).then(render,function(){serverOk=false;render();});
+    render();
+  }
+  else if(act==='deltrial'){
+    var dp=b.getAttribute('data-pid'),dt=Number(b.getAttribute('data-trial'));
+    if(armed!=='t'+dp+dt){arm('t'+dp+dt);return;}
+    armed=null;
+    if(records[dp])delete records[dp][dt];saveRecords();
+    queue=queue.filter(function(q){return !(q.pid===dp&&q.trial===dt);});saveQueue();
+    if(serverAnswered[dp])delete serverAnswered[dp][dt];
+    if(ENDPOINT)post({action:'deltrial',pid:dp,trial:dt}).then(function(){return refresh();}).then(render,function(){serverOk=false;render();});
+    render();
+  }
+  else if(act==='tg-test'){settings.test=!settings.test;saveSettings();render();}
+  else if(act==='tg-text'){settings.bigText=!settings.bigText;saveSettings();applySettings();render();}
+  else if(act==='tg-dots'){settings.bigDots=!settings.bigDots;saveSettings();applySettings();render();}
+  else if(act==='akey-save'){var k=(document.getElementById('akey_in').value||'').trim();if(k){adminKey=k;try{localStorage.setItem(LS_AKEY,k);}catch(er){}fetchPayList();render();}}
+  else if(act==='akey-reset'){adminKey='';try{localStorage.removeItem(LS_AKEY);}catch(er){}payFetchState=null;serverPay=null;render();}
+  else if(act==='pay-refresh'){fetchPayList();render();}
+  else if(act==='pay-csv-full'){blobSave('participants_수기입력용.csv',payCSV(false));}
+  else if(act==='pay-csv-mask'){blobSave('participants_증빙용.csv',payCSV(true));}
+  else if(act==='pay-json'){blobSave('participants_backup.json',JSON.stringify(mergedPay(),null,1),'application/json');}
+  else if(act==='pay-del'){
+    var id=b.getAttribute('data-id');
+    if(armed!=='pd'+id){arm('pd'+id);return;}
+    armed=null;payInfo=payInfo.filter(function(p){return p.id!==id;});savePay();
+    if(serverPay)serverPay=serverPay.filter(function(p){return p.id!==id;});
+    if(ENDPOINT&&adminKey)post({action:'delinfo',key:adminKey,id:id}).then(function(){return fetchPayList();});
+    render();
+  }
+  else if(act==='pay-clear'){
+    if(armed!=='payclear'){arm('payclear');return;}
+    armed=null;payInfo=[];savePay();serverPay=serverPay?[]:serverPay;
+    if(ENDPOINT&&adminKey)post({action:'clearinfo',key:adminKey}).then(function(){return fetchPayList();});
+    render();
+  }
+});
+app.addEventListener('input',function(e){
+  var t=e.target;if(!t||!t.id)return;
+  // 입력 즉시 문자열 형식으로 정리(숫자로 취급하지 않음)
+  if(t.id==='pi_rrn')t.value=fmtRRN(t.value);
+  else if(t.id==='pi_phone')t.value=fmtPhone(t.value);
+  else if(t.id==='pi_acct')t.value=t.value.replace(/[^0-9\-]/g,'');
+  else if(t.id==='pi_amt')t.value=digits(t.value);
+});
+document.addEventListener('keydown',function(e){
+  if(!settings.test||route.v!=='run'||!run||run.ph!=='rate')return;
+  if(e.target&&(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA'||e.target.tagName==='SELECT'))return;
+  if(e.key==='r'||e.key==='R'){fillRandom();}
+  else if(e.key===' '){e.preventDefault();fillRandom();submitRate();}
+});
+window.addEventListener('hashchange',function(){
+  if(location.hash==='#admin'){go({v:'admin'});refresh().then(render);syncPay();}
+  else if(location.hash==='#info'){infoSaved=false;go({v:'info'});}
+  else if(route.v==='admin'||route.v==='info'){route=(run?{v:'run'}:{v:'home'});render();}
+});
+window.addEventListener('online',function(){flush();syncPay();});
+if('serviceWorker' in navigator&&location.protocol.indexOf('http')===0){
+  try{navigator.serviceWorker.register('sw.js').catch(function(){});}catch(e){}
+}
+
+applySettings();
+if(location.hash==='#admin')route={v:'admin'};
+else if(location.hash==='#info')route={v:'info'};
+else if(run&&run.pid&&PIDS.indexOf(run.pid)>=0)route={v:'run'};
+else{run=null;saveRun();route={v:'home'};}
+render();
+refresh().then(function(){if(route.v!=='run')render();if(queue.length)flush();});
+if(route.v==='admin')syncPay();
+})();
+
+</script>
+</body>
+</html>
