@@ -168,6 +168,15 @@ body.big-dots .item{--dot:min(54px,calc((100vw - 104px)/7))}
 .guide.big{font-size:17px;gap:13px}
 .scalenote{margin-top:14px;font-size:15px;color:var(--muted);text-align:left}
 body.demo .wrap{padding-bottom:110px}
+
+.menurow{display:flex;align-items:center;gap:12px;padding:12px 0;border-top:1px solid var(--line)}
+.menunum{flex:none;width:26px;height:26px;border-radius:50%;background:var(--soft);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:var(--muted)}
+.menubody{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.4}
+.menubody span{font-size:13px;color:var(--muted)}
+.menubtns{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.menubtns .btn,.menurow>.btn{min-height:42px;padding:8px 16px;font-size:14.5px}
+.menusep{height:10px}
+.card.menu .sectlab{margin-bottom:2px}
 </style>
 </head>
 <body>
@@ -273,9 +282,10 @@ function answeredSet(pid){
 }
 function countOf(pid){return Object.keys(answeredSet(pid)).length;}
 function totalCount(){var n=0;for(var i=0;i<PIDS.length;i++)n+=countOf(PIDS[i]);return n;}
+function nTrials(pid){return (run&&run.pid===pid&&run.practice)?1:TOTAL_TRIALS;}
 function nextTrial(pid,after){
   var s=answeredSet(pid);
-  for(var t=(after||0)+1;t<=TOTAL_TRIALS;t++){if(!s[t])return t;}
+  for(var t=(after||0)+1;t<=nTrials(pid);t++){if(!s[t])return t;}
   return 0;
 }
 
@@ -293,12 +303,14 @@ function scheduleRetry(){
 function flush(){
   if(!ENDPOINT||!queue.length||flushing)return Promise.resolve(false);
   flushing=true;
-  var batch=queue.slice();
-  return post({records:batch}).then(function(res){
+  var first=queue[0],batch,body;
+  if(first.op){batch=[first];body={action:first.op,pid:first.pid,trial:first.trial};}
+  else{batch=[];for(var i=0;i<queue.length&&!queue[i].op;i++)batch.push(queue[i]);body={records:batch};}
+  return post(body).then(function(res){
     flushing=false;
     if(res&&res.ok){
       queue=queue.filter(function(q){return batch.indexOf(q)<0;});saveQueue();
-      if(queue.length)return flush();   // 전송 중에 쌓인 응답이 있으면 이어서 전송
+      if(queue.length)return flush();   // 전송 중에 쌓인 것이 있으면 이어서 전송
       return true;
     }
     scheduleRetry();return false;
@@ -310,6 +322,7 @@ function refresh(){
     if(res&&res.ok){
       serverAnswered={};
       for(var pid in res.answered){serverAnswered[pid]={};res.answered[pid].forEach(function(t){serverAnswered[pid][t]=true;});}
+      queue.forEach(function(q){if(q.op==='deltrial'&&serverAnswered[q.pid])delete serverAnswered[q.pid][q.trial];});   // 삭제 대기 중인 시행은 서버 목록에서 제외
       serverOk=true;return true;
     }
     serverOk=false;return false;
@@ -347,10 +360,11 @@ function setPhase(ph,trial){
   for(var i=0;i<N_ITEMS;i++)run.draft.push(null);
   saveRun();render();window.scrollTo(0,0);
 }
-function startPid(pid,demo){
-  var nt=nextTrial(pid,0);
+function startPid(pid,mode){
   demoAuto=false;clearAuto();
-  run={pid:pid,trial:nt||TOTAL_TRIALS,ph:'intro',phStart:Date.now(),draft:null,demo:!!demo};
+  run={pid:pid,trial:1,ph:'intro',phStart:Date.now(),draft:null,demo:mode==='demo',practice:mode==='practice'};
+  var nt=nextTrial(pid,0);
+  run.trial=nt||nTrials(pid);
   if(!nt)run.ph='done';
   else if(nt===1)run.ph='intro';
   else if(ordOf(pid)[nt-1].pos===1)run.ph='break';
@@ -387,7 +401,7 @@ var app=document.getElementById('app');
 function bannerHTML(){
   if(settings.test)return '<div class="banner">테스트 모드 켜짐 — 실제 실험 전에 [관리자 → 화면·테스트 설정]에서 꺼 주세요. 테스트로 넣은 참가자는 초기화로 지울 수 있어요.</div>';
   if(route.v==='run'&&run&&run.demo)return '<div class="banner">시연 모드 — 기록되지 않습니다. 대기 시간은 실제와 같으며(관찰 '+OBS_SEC+'초, 교체 '+BREAK_SEC+'초), 오른쪽 아래 [대기 건너뛰기]로 넘길 수 있습니다.</div>';
-  if(route.v==='run'&&run&&isPractice(run.pid))return '<div class="banner">연습 모드 — 이 화면의 응답은 기록되지 않습니다.</div>';
+  if(route.v==='run'&&run&&isPractice(run.pid))return '<div class="banner">연습 모드 — 시편 1개로 진행 방식을 익히는 연습입니다. 응답은 기록되지 않습니다.</div>';
   if(route.v==='run')return '';
   if(!ENDPOINT)return '<div class="banner">구글 시트 연결 전 — index.html 상단의 ENDPOINT에 Apps Script 웹 앱 URL을 넣어야 서버 저장이 됩니다. 지금은 이 기기에만 저장돼요.</div>';
   if(queue.length)return '<div class="banner">서버 전송 대기 '+queue.length+'건 — 응답은 이 기기에 보관 중이고, 연결되면 자동으로 전송됩니다.</div>';
@@ -402,7 +416,8 @@ function obsMs(){return OBS_SEC*1000;}
 function breakMs(){return BREAK_SEC*1000;}
 function clearAuto(){if(autoT){clearTimeout(autoT);autoT=null;}}
 function demoBarHTML(){
-  var b='style="min-height:42px;padding:8px 16px;font-size:14.5px;box-shadow:var(--shadow);background:var(--surface)"',h='';
+  var b='style="min-height:42px;padding:8px 16px;font-size:14.5px;box-shadow:var(--shadow);background:var(--surface)"',h='<button class="btn ghost" '+b+' data-act="exit">🏠 홈으로</button>';
+  if(!run.demo)return '<div id="demobar" style="position:fixed;right:14px;bottom:14px;z-index:40;display:flex;gap:8px;justify-content:flex-end">'+h+'</div>';
   if(run.ph==='obs'||run.ph==='break')h+='<button class="btn ghost" '+b+' data-act="skip">대기 건너뛰기</button>';
   if(run.ph==='rate')h+='<button class="btn ghost" '+b+' data-act="rand">랜덤 입력</button><button class="btn ghost" '+b+' data-act="stepauto">랜덤+저장</button>';
   if(run.ph!=='done')h+='<button class="btn" '+b.replace('background:var(--surface)','background:var(--accent)')+' data-act="autoplay">'+(demoAuto?'■ 자동 진행 정지':'▶ 자동 진행 (대기 생략)')+'</button>';
@@ -426,10 +441,10 @@ function scheduleAuto(){
 }
 function render(){
   renderCore();
-  var d=isDemo();
-  document.body.classList.toggle('demo',d);
+  var d=isDemo(),pr=!!(route.v==='run'&&run&&run.practice);
+  document.body.classList.toggle('demo',d||pr);
+  if(d||pr)app.insertAdjacentHTML('beforeend',demoBarHTML());
   if(d){
-    app.insertAdjacentHTML('beforeend',demoBarHTML());
     if(run.ph==='done')demoAuto=false;
     if(demoAuto)scheduleAuto();else clearAuto();
   }else{clearAuto();}
@@ -448,20 +463,23 @@ function groupGrid(prefix){
   }
   return '<div class="sect"><p class="sectlab">'+COND_LABEL[prefix]+' 집단 ('+prefix+') — 완료 '+doneN+' · 진행 중 '+partN+'</p><div class="pgrid">'+cells+'</div></div>';
 }
+function menuRow(num,title,desc,btns){
+  return '<div class="menurow"><span class="menunum">'+num+'</span><div class="menubody"><b>'+title+'</b><span>'+desc+'</span></div>'+(btns?'<div class="menubtns">'+btns+'</div>':'')+'</div>';
+}
 function renderHome(){
   app.innerHTML='<div class="wrap">'+bannerHTML()
     +'<p class="eyebrow">2차 실험 · 시각 vs 시각+촉각</p>'
     +'<h1>재생 플라스틱 소재 평가</h1>'
-    +'<p class="sub">참가자를 선택하면 지정된 순서로 평가가 진행됩니다. V = 시각 집단, T = 시각+촉각 집단.</p>'
-    +'<div class="stats"><span>누적 응답 <b>'+totalCount()+'</b> / '+TOTAL+'</span></div>'
+    +'<div class="card menu" style="margin-top:16px"><p class="sectlab">진행 순서</p>'
+    +menuRow('1','인적사항 입력','참가자가 참여비 지급 정보를 입력합니다','<button class="btn" data-act="goinfo">입력하기</button>')
+    +menuRow('2','연습','시편 1개로 진행 방식을 익힙니다 · 기록 안 됨','<button class="btn ghost" data-act="practice" data-pid="V00">시각</button><button class="btn ghost" data-act="practice" data-pid="T00">시각+촉각</button>')
+    +menuRow('3','평가','아래에서 참가자를 선택하면 시작됩니다','')
+    +'<div class="menusep"></div>'
+    +menuRow('·','전체 시연','9개 시편 전 과정을 미리 보기 · 기록 안 됨','<button class="btn ghost" data-act="demo" data-pid="V00">시각</button><button class="btn ghost" data-act="demo" data-pid="T00">시각+촉각</button>')
+    +'</div>'
+    +'<p class="sectlab" style="margin-top:26px">참가자 선택 (V = 시각 집단, T = 시각+촉각 집단)</p>'
+    +'<div class="stats" style="margin-top:6px"><span>누적 응답 <b>'+totalCount()+'</b> / '+TOTAL+'</span></div>'
     +groupGrid('V')+groupGrid('T')
-    +'<div class="foot" style="gap:10px;flex-wrap:wrap">'
-    +'<button class="btn ghost" data-act="practice" data-pid="V00">연습 — 시각 방식 (기록 안 됨)</button>'
-    +'<button class="btn ghost" data-act="practice" data-pid="T00">연습 — 시각+촉각 방식 (기록 안 됨)</button>'
-    +'<button class="btn ghost" data-act="goinfo">인적사항만 따로 입력</button></div>'
-    +'<div class="foot" style="gap:10px;flex-wrap:wrap;margin-top:12px">'
-    +'<button class="btn ghost" data-act="demo" data-pid="V00">시연 — 시각 방식 (교수님 시연용)</button>'
-    +'<button class="btn ghost" data-act="demo" data-pid="T00">시연 — 시각+촉각 방식 (교수님 시연용)</button></div>'
     +'</div>';
 }
 
@@ -479,9 +497,10 @@ function showCode(btn,trial){
     btn.classList.add('masked');btn.style.fontSize='';btn.textContent='시편 코드 확인 (진행자용)';
   },4000);
 }
+function modeName(){return run.practice?'연습':(run.demo?'시연':run.pid);}
 function metaLine(){
   var o=ordOf(run.pid)[run.trial-1];
-  return '<p class="mono" style="font-size:13.5px;color:var(--muted);opacity:.8;margin-top:8px">'+(isPractice(run.pid)?'연습':run.pid)+' · 시편 '+run.trial+' / '+TOTAL_TRIALS+' (세트 '+o.set+')</p>';
+  return '<p class="mono" style="font-size:13.5px;color:var(--muted);opacity:.8;margin-top:8px">'+modeName()+' · 시편 '+run.trial+' / '+nTrials(run.pid)+(run.practice?'':' (세트 '+o.set+')')+'</p>';
 }
 
 // ─── 안내 ───
@@ -492,33 +511,59 @@ function touchGuideHTML(){
     :'<li><b>시각</b> — 시편을 눈으로만 관찰해 주세요. 시편에 손을 대지 마세요.</li>';
 }
 function renderIntro(){
+  var pr=!!run.practice;
   app.innerHTML='<div class="wrap center vwrap">'+bannerHTML()
     +'<p class="eyebrow">재생 플라스틱 소재 평가</p>'
-    +'<h1 style="font-size:24px">평가를 시작합니다</h1>'
+    +'<h1 style="font-size:24px">'+(pr?'연습을 시작합니다':'평가를 시작합니다')+'</h1>'
     +'<div class="card" style="text-align:left;margin-top:18px"><ul class="guide big">'
-    +'<li>시편은 3개씩 3세트, 총 <b>9개</b>입니다.</li>'
+    +(pr?'<li>시편 <b>1개</b>로 진행 방식을 익히는 연습입니다. 응답은 기록되지 않습니다.</li>':'<li>시편은 3개씩 3세트, 총 <b>9개</b>입니다.</li>')
     +'<li>시편마다 <b>'+OBS_SEC+'초</b> 관찰한 뒤, 18개 문항에 응답합니다.</li>'
     +'<li>응답은 <b>1점(전혀 그렇지 않다) ~ 7점(매우 그렇다)</b> 중에서 고릅니다.</li>'
     +touchGuideHTML()
-    +'<li>세트마다 시편 3개를 <b>하나씩 순서대로</b> 관찰하고 평가합니다.</li>'
-    +'<li>세트가 끝나면 진행자가 시편을 교체합니다. 정답은 없으니 느낀 대로 응답해 주세요.</li>'
+    +(pr?'<li>정답은 없으니 느낀 대로 응답해 주세요.</li>'
+        :'<li>세트마다 시편 3개를 <b>하나씩 순서대로</b> 관찰하고 평가합니다.</li><li>세트가 끝나면 진행자가 시편을 교체합니다. 정답은 없으니 느낀 대로 응답해 주세요.</li>')
     +'</ul></div>'
-    +'<div class="btnrow" style="margin-top:28px"><button class="btn wide" data-act="begin">첫 세트 시작</button></div>'
+    +'<div class="btnrow" style="margin-top:28px"><button class="btn wide" data-act="begin">'+(pr?'연습 시작':'첫 세트 시작')+'</button></div>'
     +'<div style="margin-top:14px">'+codeChipHTML(run.trial)+'</div>'
     +'<p style="margin-top:40px"><button class="backlink" data-act="leave">세션 나가기</button></p>'
     +metaLine()+'</div>';
 }
 
 // ─── 관찰 ───
+function redoLinkHTML(){
+  if(!run||run.practice)return '';
+  var prev=run.ph==='done'?run.trial:run.trial-1;
+  if(prev<1)return '';
+  if(run.ph==='obs'){var os=ordOf(run.pid);if(os[prev-1].set!==os[run.trial-1].set)return '';}   // 같은 세트 안에서만(시편이 아직 눈앞에 있을 때)
+  if(!run.demo&&!answeredSet(run.pid)[prev])return '';
+  return '<p style="margin-top:12px"><button class="backlink" data-act="redo">↩ 이전 시편 다시 평가</button></p>';
+}
+function redoPrev(){
+  var pid=run.pid,prev=run.ph==='done'?run.trial:run.trial-1;
+  if(prev<1)return;
+  if(!isPractice(pid)){
+    if(!confirm('이전 시편('+prev+'번째)의 응답을 지우고 다시 평가합니다. 계속할까요?'))return;
+    if(records[pid])delete records[pid][prev];
+    saveRecords();
+    // 아직 전송 전인 응답은 큐에서 제거, 이미 전송됐을 수 있으므로 서버 삭제를 '순서대로' 큐에 넣음(새 응답은 그 뒤에 전송됨)
+    queue=queue.filter(function(q){return q.op||!(q.pid===pid&&q.trial===prev);});
+    if(ENDPOINT)queue.push({op:'deltrial',pid:pid,trial:prev});
+    saveQueue();
+    if(serverAnswered[pid])delete serverAnswered[pid][prev];
+    flush();
+  }
+  setPhase('rate',prev);
+}
 function renderObs(){
   var o=ordOf(run.pid)[run.trial-1],touch=condOf(run.pid)==='T';
   app.innerHTML='<div class="wrap center vwrap">'+bannerHTML()
-    +'<p class="eyebrow">세트 '+o.set+' / 3 · 시편 '+run.trial+' / '+TOTAL_TRIALS+'</p>'
+    +'<p class="eyebrow">'+(run.practice?'연습 · 시편 '+run.trial+' / '+nTrials(run.pid):'세트 '+o.set+' / 3 · 시편 '+run.trial+' / '+TOTAL_TRIALS)+'</p>'
     +'<h1 style="font-size:26px;margin-top:14px">'+POS_LABEL[o.pos-1]+' 시편을 관찰해 주세요</h1>'
     +'<p class="sub" style="font-size:16px;margin-top:14px">'+(touch?'눈으로 보면서 <b>손가락·손바닥으로 표면만</b> 만져 보세요.<br><span style="color:var(--danger)">두드리기·구부리기·들어보기는 하지 마세요.</span>':'눈으로만 관찰해 주세요.<br>시편에 손을 대지 마세요.')+'</p>'
     +'<div class="btnrow" id="startrate" style="margin-top:44px;display:none"><button class="btn wide" data-act="startrate">설문 시작</button></div>'
     +(settings.test?'<div class="btnrow" style="margin-top:40px"><button class="btn ghost wide" data-act="skip">관찰 건너뛰기 (테스트)</button></div>':'')
     +'<p style="margin-top:48px"><button class="backlink" data-act="leave">세션 나가기</button></p>'
+    +redoLinkHTML()
     +metaLine()+'</div>';
   // 남은 시간은 참가자에게 보이지 않음 — 관찰 시간이 지나면 [설문 시작] 버튼만 나타남
   var sb=document.getElementById('startrate');
@@ -543,8 +588,8 @@ function answeredN(){var n=0;for(var i=0;i<N_ITEMS;i++){if(run.draft[i]!=null)n+
 function renderRate(){
   var o=ordOf(run.pid)[run.trial-1],last=!nextTrial(run.pid,run.trial);
   app.innerHTML='<div class="wrap">'
-    +'<div class="topbar"><div class="topline"><span class="mono">'+(isPractice(run.pid)?'연습':run.pid)+' · 세트 '+o.set+' / 3</span><span>시편 <b>'+run.trial+'</b> / '+TOTAL_TRIALS+' · 응답 <b id="ansn">'+answeredN()+'</b> / '+N_ITEMS+'</span></div>'
-    +'<div class="bar"><i id="ansbar" style="width:'+Math.round((isPractice(run.pid)?run.trial-1:countOf(run.pid))/TOTAL_TRIALS*100)+'%"></i></div></div>'
+    +'<div class="topbar"><div class="topline"><span class="mono">'+modeName()+(run.practice?'':' · 세트 '+o.set+' / 3')+'</span><span>시편 <b>'+run.trial+'</b> / '+nTrials(run.pid)+' · 응답 <b id="ansn">'+answeredN()+'</b> / '+N_ITEMS+'</span></div>'
+    +'<div class="bar"><i id="ansbar" style="width:'+Math.round((isPractice(run.pid)?run.trial-1:countOf(run.pid))/nTrials(run.pid)*100)+'%"></i></div></div>'
     +bannerHTML()
     +'<p class="hint"><b>'+POS_LABEL[o.pos-1]+' 시편</b>에 대해, 각 문항에 얼마나 동의하는지 응답해 주세요.</p>'
     +itemRowsHTML()
@@ -627,7 +672,8 @@ function renderDone(){
       :'<h1 style="font-size:22px">'+run.pid+' 평가 종료</h1>'
         +'<p class="sub">시편 9개 평가가 모두 기록되었습니다.<br>참여해 주셔서 감사합니다.</p></div>'
         +'<div class="btnrow"><button class="btn wide" data-act="leave">참가자 선택으로</button>'
-        +'<button class="btn ghost wide" data-act="goinfo-run">이 참가자 인적사항 입력</button></div></div>');
+        +'<button class="btn ghost wide" data-act="goinfo-run">이 참가자 인적사항 입력</button></div>'
+        +redoLinkHTML()+'</div>');
 }
 
 // ─── 인적사항 ───
@@ -851,8 +897,11 @@ app.addEventListener('click',function(e){
   var act=b.getAttribute('data-act');
   // 화면이 막 바뀐 직후의 더블탭이 엉뚱한 버튼(점수·나가기)을 누르지 않도록 무시 (테스트 모드 제외)
   if(!settings.test&&route.v==='run'&&run&&(act==='dot'||act==='submit'||act==='leave')&&Date.now()-run.phStart<700)return;
-  if(act==='pick'||act==='practice'){startPid(b.getAttribute('data-pid'));}
-  else if(act==='demo'){startPid(b.getAttribute('data-pid'),true);}
+  if(act==='pick'){startPid(b.getAttribute('data-pid'));}
+  else if(act==='practice'){startPid(b.getAttribute('data-pid'),'practice');}
+  else if(act==='demo'){startPid(b.getAttribute('data-pid'),'demo');}
+  else if(act==='exit'){leaveRun();}
+  else if(act==='redo'){redoPrev();}
   else if(act==='autoplay'){
     demoAuto=!demoAuto;
     var bar=document.getElementById('demobar');if(bar)bar.outerHTML=demoBarHTML();
@@ -861,7 +910,7 @@ app.addEventListener('click',function(e){
   else if(act==='goinfo'){infoSaved=false;pendingInfoPid=null;go({v:'info'});}
   else if(act==='goinfo-run'){infoSaved=false;pendingInfoPid=run?run.pid:null;go({v:'info'});}
   else if(act==='leave'){
-    if(run&&run.ph!=='done'&&!confirm('세션을 나가시겠습니까? 진행 중인 응답은 저장되지 않습니다.'))return;
+    if(run&&run.ph!=='done'&&!isPractice(run.pid)&&!confirm('세션을 나가시겠습니까? 진행 중인 응답은 저장되지 않습니다.'))return;
     leaveRun();
   }
   else if(act==='showcode'){showCode(b,Number(b.getAttribute('data-trial')));}
