@@ -226,6 +226,7 @@ for(i0=1;i0<=N_PER_GROUP;i0++)PIDS.push('V'+pad2(i0));
 for(i0=1;i0<=N_PER_GROUP;i0++)PIDS.push('T'+pad2(i0));
 var TOTAL=PIDS.length*TOTAL_TRIALS;
 function condOf(pid){return pid.charAt(0);}
+function isPractice(pid){return pid==='V00'||pid==='T00';}
 
 // ─── 제시 순서 ───
 // 같은 번호의 V·T 참가자는 같은 순서를 받는다(집단 간 순서 통제).
@@ -233,7 +234,7 @@ function condOf(pid){return pid.charAt(0);}
 var ordCache={};
 function ordOf(pid){
   if(ordCache[pid])return ordCache[pid];
-  var k=parseInt(pid.slice(1),10)-1,perm=SET_ORDER_MODE==='fixed'?PERMS[0]:PERMS[k%6],out=[],t=1;
+  var k=Math.max(0,parseInt(pid.slice(1),10)-1),perm=SET_ORDER_MODE==='fixed'?PERMS[0]:PERMS[k%6],out=[],t=1;
   for(var s=0;s<3;s++){
     var base=LEVELS[perm[s]].slice(),rot=(Math.floor(k/6)+s)%3;
     var arr=base.slice(rot).concat(base.slice(0,rot));
@@ -316,6 +317,7 @@ function refresh(){
 
 // ─── 응답 기록 ───
 function saveRecord(pid,trial,ratings,rateSec){
+  if(isPractice(pid))return;   // 연습 모드: 기록·전송 없음
   var o=ordOf(pid)[trial-1],now=Date.now();
   var rec={pid:pid,cond:COND_KEY[condOf(pid)],trial:trial,set:o.set,level:o.level,pos:o.pos,material:o.material,
     ratings:ratings,rateSec:rateSec,ts:new Date(now).toISOString(),client:deviceId+(settings.test?'-test':'')};
@@ -382,6 +384,7 @@ var app=document.getElementById('app');
 
 function bannerHTML(){
   if(settings.test)return '<div class="banner">테스트 모드 켜짐 — 실제 실험 전에 [관리자 → 화면·테스트 설정]에서 꺼 주세요. 테스트로 넣은 참가자는 초기화로 지울 수 있어요.</div>';
+  if(route.v==='run'&&run&&isPractice(run.pid))return '<div class="banner">연습 모드 — 이 화면의 응답은 기록되지 않습니다.</div>';
   if(route.v==='run')return '';
   if(!ENDPOINT)return '<div class="banner">구글 시트 연결 전 — index.html 상단의 ENDPOINT에 Apps Script 웹 앱 URL을 넣어야 서버 저장이 됩니다. 지금은 이 기기에만 저장돼요.</div>';
   if(queue.length)return '<div class="banner">서버 전송 대기 '+queue.length+'건 — 응답은 이 기기에 보관 중이고, 연결되면 자동으로 전송됩니다.</div>';
@@ -409,7 +412,10 @@ function renderHome(){
     +'<p class="sub">참가자를 선택하면 지정된 순서로 평가가 진행됩니다. V = 시각 집단, T = 시각+촉각 집단.</p>'
     +'<div class="stats"><span>누적 응답 <b>'+totalCount()+'</b> / '+TOTAL+'</span></div>'
     +groupGrid('V')+groupGrid('T')
-    +'<div class="foot"><button class="btn ghost" data-act="goinfo">인적사항만 따로 입력</button></div>'
+    +'<div class="foot" style="gap:10px;flex-wrap:wrap">'
+    +'<button class="btn ghost" data-act="practice" data-pid="V00">연습 — 시각 방식 (기록 안 됨)</button>'
+    +'<button class="btn ghost" data-act="practice" data-pid="T00">연습 — 시각+촉각 방식 (기록 안 됨)</button>'
+    +'<button class="btn ghost" data-act="goinfo">인적사항만 따로 입력</button></div>'
     +'</div>';
 }
 
@@ -429,7 +435,7 @@ function showCode(btn,trial){
 }
 function metaLine(){
   var o=ordOf(run.pid)[run.trial-1];
-  return '<p class="mono" style="font-size:13.5px;color:var(--muted);opacity:.8;margin-top:8px">'+run.pid+' · 시편 '+run.trial+' / '+TOTAL_TRIALS+' (세트 '+o.set+')</p>';
+  return '<p class="mono" style="font-size:13.5px;color:var(--muted);opacity:.8;margin-top:8px">'+(isPractice(run.pid)?'연습':run.pid)+' · 시편 '+run.trial+' / '+TOTAL_TRIALS+' (세트 '+o.set+')</p>';
 }
 
 // ─── 안내 ───
@@ -491,8 +497,8 @@ function answeredN(){var n=0;for(var i=0;i<N_ITEMS;i++){if(run.draft[i]!=null)n+
 function renderRate(){
   var o=ordOf(run.pid)[run.trial-1],last=!nextTrial(run.pid,run.trial);
   app.innerHTML='<div class="wrap">'
-    +'<div class="topbar"><div class="topline"><span class="mono">'+run.pid+' · 세트 '+o.set+' / 3</span><span>시편 <b>'+run.trial+'</b> / '+TOTAL_TRIALS+' · 응답 <b id="ansn">'+answeredN()+'</b> / '+N_ITEMS+'</span></div>'
-    +'<div class="bar"><i id="ansbar" style="width:'+Math.round(countOf(run.pid)/TOTAL_TRIALS*100)+'%"></i></div></div>'
+    +'<div class="topbar"><div class="topline"><span class="mono">'+(isPractice(run.pid)?'연습':run.pid)+' · 세트 '+o.set+' / 3</span><span>시편 <b>'+run.trial+'</b> / '+TOTAL_TRIALS+' · 응답 <b id="ansn">'+answeredN()+'</b> / '+N_ITEMS+'</span></div>'
+    +'<div class="bar"><i id="ansbar" style="width:'+Math.round((isPractice(run.pid)?run.trial-1:countOf(run.pid))/TOTAL_TRIALS*100)+'%"></i></div></div>'
     +bannerHTML()
     +'<p class="hint"><b>'+POS_LABEL[o.pos-1]+' 시편</b>에 대해, 각 문항에 얼마나 동의하는지 응답해 주세요.</p>'
     +itemRowsHTML()
@@ -569,10 +575,13 @@ function renderBreak(){
 function renderDone(){
   app.innerHTML='<div class="wrap center vwrap">'+bannerHTML()
     +'<div class="card" style="padding:36px 24px"><div class="donemark">✓</div>'
-    +'<h1 style="font-size:22px">'+run.pid+' 평가 종료</h1>'
-    +'<p class="sub">시편 9개 평가가 모두 기록되었습니다.<br>참여해 주셔서 감사합니다.</p></div>'
-    +'<div class="btnrow"><button class="btn wide" data-act="leave">참가자 선택으로</button>'
-    +'<button class="btn ghost wide" data-act="goinfo-run">이 참가자 인적사항 입력</button></div></div>';
+    +(isPractice(run.pid)
+      ?'<h1 style="font-size:22px">연습 종료</h1><p class="sub">연습 응답은 기록되지 않았습니다.</p></div>'
+        +'<div class="btnrow"><button class="btn wide" data-act="leave">처음 화면으로</button></div></div>'
+      :'<h1 style="font-size:22px">'+run.pid+' 평가 종료</h1>'
+        +'<p class="sub">시편 9개 평가가 모두 기록되었습니다.<br>참여해 주셔서 감사합니다.</p></div>'
+        +'<div class="btnrow"><button class="btn wide" data-act="leave">참가자 선택으로</button>'
+        +'<button class="btn ghost wide" data-act="goinfo-run">이 참가자 인적사항 입력</button></div></div>');
 }
 
 // ─── 인적사항 ───
@@ -796,7 +805,7 @@ app.addEventListener('click',function(e){
   var act=b.getAttribute('data-act');
   // 화면이 막 바뀐 직후의 더블탭이 엉뚱한 버튼(점수·나가기)을 누르지 않도록 무시 (테스트 모드 제외)
   if(!settings.test&&route.v==='run'&&run&&(act==='dot'||act==='submit'||act==='leave')&&Date.now()-run.phStart<700)return;
-  if(act==='pick'){startPid(b.getAttribute('data-pid'));}
+  if(act==='pick'||act==='practice'){startPid(b.getAttribute('data-pid'));}
   else if(act==='goinfo'){infoSaved=false;pendingInfoPid=null;go({v:'info'});}
   else if(act==='goinfo-run'){infoSaved=false;pendingInfoPid=run?run.pid:null;go({v:'info'});}
   else if(act==='leave'){
@@ -890,7 +899,7 @@ if('serviceWorker' in navigator&&location.protocol.indexOf('http')===0){
 applySettings();
 if(location.hash==='#admin')route={v:'admin'};
 else if(location.hash==='#info')route={v:'info'};
-else if(run&&run.pid&&PIDS.indexOf(run.pid)>=0)route={v:'run'};
+else if(run&&run.pid&&(PIDS.indexOf(run.pid)>=0||isPractice(run.pid)))route={v:'run'};
 else{run=null;saveRun();route={v:'home'};}
 render();
 refresh().then(function(){if(route.v!=='run')render();if(queue.length)flush();});
