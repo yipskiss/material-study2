@@ -167,6 +167,7 @@ body.big-dots .item{--dot:min(54px,calc((100vw - 104px)/7))}
 .pbtn.next .st{color:var(--accent);font-weight:500}
 .guide.big{font-size:17px;gap:13px}
 .scalenote{margin-top:14px;font-size:15px;color:var(--muted);text-align:left}
+body.demo .wrap{padding-bottom:110px}
 </style>
 </head>
 <body>
@@ -346,9 +347,10 @@ function setPhase(ph,trial){
   for(var i=0;i<N_ITEMS;i++)run.draft.push(null);
   saveRun();render();window.scrollTo(0,0);
 }
-function startPid(pid){
+function startPid(pid,demo){
   var nt=nextTrial(pid,0);
-  run={pid:pid,trial:nt||TOTAL_TRIALS,ph:'intro',phStart:Date.now(),draft:null};
+  demoAuto=false;clearAuto();
+  run={pid:pid,trial:nt||TOTAL_TRIALS,ph:'intro',phStart:Date.now(),draft:null,demo:!!demo};
   if(!nt)run.ph='done';
   else if(nt===1)run.ph='intro';
   else if(ordOf(pid)[nt-1].pos===1)run.ph='break';
@@ -356,7 +358,7 @@ function startPid(pid){
   run.draft=[];for(var i=0;i<N_ITEMS;i++)run.draft.push(null);
   saveRun();go({v:'run'});
 }
-function leaveRun(){clearTimer();run=null;saveRun();go({v:'home'});}
+function leaveRun(){clearTimer();demoAuto=false;clearAuto();run=null;saveRun();go({v:'home'});}
 
 var wakeLock=null;
 function keepAwake(){
@@ -366,7 +368,7 @@ function keepAwake(){
   }catch(e){}
 }
 document.addEventListener('visibilitychange',function(){if(document.visibilityState==='visible'&&route.v==='run')keepAwake();});
-function render(){
+function renderCore(){
   clearTimer();
   if(route.v==='run')keepAwake();
   if(route.v==='admin')return renderAdmin();
@@ -384,12 +386,54 @@ var app=document.getElementById('app');
 
 function bannerHTML(){
   if(settings.test)return '<div class="banner">테스트 모드 켜짐 — 실제 실험 전에 [관리자 → 화면·테스트 설정]에서 꺼 주세요. 테스트로 넣은 참가자는 초기화로 지울 수 있어요.</div>';
+  if(route.v==='run'&&run&&run.demo)return '<div class="banner">시연 모드 — 기록되지 않으며, 보여드리기 위해 관찰·교체 대기를 '+DEMO_SEC+'초로 줄였습니다 (실제 실험: 관찰 '+OBS_SEC+'초, 교체 '+BREAK_SEC+'초).</div>';
   if(route.v==='run'&&run&&isPractice(run.pid))return '<div class="banner">연습 모드 — 이 화면의 응답은 기록되지 않습니다.</div>';
   if(route.v==='run')return '';
   if(!ENDPOINT)return '<div class="banner">구글 시트 연결 전 — index.html 상단의 ENDPOINT에 Apps Script 웹 앱 URL을 넣어야 서버 저장이 됩니다. 지금은 이 기기에만 저장돼요.</div>';
   if(queue.length)return '<div class="banner">서버 전송 대기 '+queue.length+'건 — 응답은 이 기기에 보관 중이고, 연결되면 자동으로 전송됩니다.</div>';
   if(serverOk===false)return '<div class="banner">구글 시트 연결 확인 실패 — 인터넷/배포 설정을 확인하세요. 응답은 이 기기에 저장되고 있습니다.</div>';
   return '';
+}
+
+// ─── 시연 모드 (교수님 시연용: 기록 안 됨 · 대기 시간 단축 · 자동 진행) ───
+var DEMO_SEC=3;            // 시연 때 관찰·교체 대기 시간(초). 실제 실험은 OBS_SEC / BREAK_SEC
+var demoAuto=false,autoT=null;
+function isDemo(){return !!(route.v==='run'&&run&&run.demo);}
+function obsMs(){return (isDemo()?DEMO_SEC:OBS_SEC)*1000;}
+function breakMs(){return (isDemo()?DEMO_SEC:BREAK_SEC)*1000;}
+function clearAuto(){if(autoT){clearTimeout(autoT);autoT=null;}}
+function demoBarHTML(){
+  var b='style="min-height:42px;padding:8px 16px;font-size:14.5px;box-shadow:var(--shadow);background:var(--surface)"',h='';
+  if(run.ph==='obs'||run.ph==='break')h+='<button class="btn ghost" '+b+' data-act="skip">건너뛰기</button>';
+  if(run.ph==='rate')h+='<button class="btn ghost" '+b+' data-act="rand">랜덤 입력</button><button class="btn ghost" '+b+' data-act="stepauto">랜덤+저장</button>';
+  if(run.ph!=='done')h+='<button class="btn" '+b.replace('background:var(--surface)','background:var(--accent)')+' data-act="autoplay">'+(demoAuto?'■ 자동 진행 정지':'▶ 자동 진행')+'</button>';
+  return '<div id="demobar" style="position:fixed;right:14px;bottom:14px;z-index:40;display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;max-width:calc(100vw - 28px)">'+h+'</div>';
+}
+function scheduleAuto(){
+  clearAuto();
+  var ph=run.ph;
+  function ok(){return demoAuto&&isDemo()&&run.ph===ph;}
+  if(ph==='intro'){autoT=setTimeout(function(){if(ok())setPhase('obs');},2000);}
+  else if(ph==='obs'||ph==='break'){autoT=setTimeout(function(){if(ok())setPhase(ph==='obs'?'rate':'obs');},DEMO_SEC*1000+1200);}
+  else if(ph==='rate'){
+    autoT=setTimeout(function step(){
+      if(!ok())return;
+      var i=0;while(i<N_ITEMS&&run.draft[i]!=null)i++;
+      if(i>=N_ITEMS){autoT=setTimeout(function(){if(ok())submitRate();},1000);return;}
+      setDot(i,1+Math.floor(Math.random()*LIKERT_MAX),true);
+      autoT=setTimeout(step,320);
+    },900);
+  }
+}
+function render(){
+  renderCore();
+  var d=isDemo();
+  document.body.classList.toggle('demo',d);
+  if(d){
+    app.insertAdjacentHTML('beforeend',demoBarHTML());
+    if(run.ph==='done')demoAuto=false;
+    if(demoAuto)scheduleAuto();else clearAuto();
+  }else{clearAuto();}
 }
 
 // ─── 홈 ───
@@ -416,6 +460,9 @@ function renderHome(){
     +'<button class="btn ghost" data-act="practice" data-pid="V00">연습 — 시각 방식 (기록 안 됨)</button>'
     +'<button class="btn ghost" data-act="practice" data-pid="T00">연습 — 시각+촉각 방식 (기록 안 됨)</button>'
     +'<button class="btn ghost" data-act="goinfo">인적사항만 따로 입력</button></div>'
+    +'<div class="foot" style="gap:10px;flex-wrap:wrap;margin-top:12px">'
+    +'<button class="btn ghost" data-act="demo" data-pid="V00">시연 — 시각 방식 (교수님 시연용)</button>'
+    +'<button class="btn ghost" data-act="demo" data-pid="T00">시연 — 시각+촉각 방식 (교수님 시연용)</button></div>'
     +'</div>';
 }
 
@@ -476,7 +523,7 @@ function renderObs(){
     +metaLine()+'</div>';
   // 남은 시간은 참가자에게 보이지 않음 — 관찰 시간이 지나면 [설문 시작] 버튼만 나타남
   var sb=document.getElementById('startrate');
-  countdown(OBS_SEC*1000,function(){},function(){sb.style.display='';});
+  countdown(obsMs(),function(){},function(){sb.style.display='';});
 }
 
 // ─── 평가 ───
@@ -569,14 +616,14 @@ function renderBreak(){
     +'<p style="margin-top:40px"><button class="backlink" data-act="leave">세션 나가기</button></p>'
     +metaLine()+'</div>';
   var nb=document.getElementById('nextset');
-  countdown(BREAK_SEC*1000,function(){},function(){nb.style.display='';});
+  countdown(breakMs(),function(){},function(){nb.style.display='';});
 }
 
 function renderDone(){
   app.innerHTML='<div class="wrap center vwrap">'+bannerHTML()
     +'<div class="card" style="padding:36px 24px"><div class="donemark">✓</div>'
     +(isPractice(run.pid)
-      ?'<h1 style="font-size:22px">연습 종료</h1><p class="sub">연습 응답은 기록되지 않았습니다.</p></div>'
+      ?'<h1 style="font-size:22px">'+(run.demo?'시연':'연습')+' 종료</h1><p class="sub">응답은 기록되지 않았습니다.</p></div>'
         +'<div class="btnrow"><button class="btn wide" data-act="leave">처음 화면으로</button></div></div>'
       :'<h1 style="font-size:22px">'+run.pid+' 평가 종료</h1>'
         +'<p class="sub">시편 9개 평가가 모두 기록되었습니다.<br>참여해 주셔서 감사합니다.</p></div>'
@@ -806,6 +853,12 @@ app.addEventListener('click',function(e){
   // 화면이 막 바뀐 직후의 더블탭이 엉뚱한 버튼(점수·나가기)을 누르지 않도록 무시 (테스트 모드 제외)
   if(!settings.test&&route.v==='run'&&run&&(act==='dot'||act==='submit'||act==='leave')&&Date.now()-run.phStart<700)return;
   if(act==='pick'||act==='practice'){startPid(b.getAttribute('data-pid'));}
+  else if(act==='demo'){startPid(b.getAttribute('data-pid'),true);}
+  else if(act==='autoplay'){
+    demoAuto=!demoAuto;
+    var bar=document.getElementById('demobar');if(bar)bar.outerHTML=demoBarHTML();
+    if(demoAuto)scheduleAuto();else clearAuto();
+  }
   else if(act==='goinfo'){infoSaved=false;pendingInfoPid=null;go({v:'info'});}
   else if(act==='goinfo-run'){infoSaved=false;pendingInfoPid=run?run.pid:null;go({v:'info'});}
   else if(act==='leave'){
