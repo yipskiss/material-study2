@@ -390,6 +390,30 @@ function startPid(pid,mode){
 function leaveRun(){clearTimer();demoAuto=false;clearAuto();run=null;saveRun();go({v:'home'});}
 
 var wakeLock=null;
+// ─── 관찰 종료 알림음 (파일 없이 브라우저에서 생성: 부드러운 두 음 차임, 약 0.6초) ───
+var audioCtx=null;
+function unlockAudio(){   // 태블릿은 화면을 누른 순간에만 소리를 낼 수 있으므로 클릭마다 준비
+  try{
+    var AC=window.AudioContext||window.webkitAudioContext;if(!AC)return;
+    if(!audioCtx)audioCtx=new AC();
+    if(audioCtx.state==='suspended')audioCtx.resume();
+  }catch(e){}
+}
+function chime(){
+  try{
+    if(!audioCtx||audioCtx.state!=='running')return;
+    var t0=audioCtx.currentTime+0.02;
+    [[880,0],[659.25,0.26]].forEach(function(n){
+      var osc=audioCtx.createOscillator(),g=audioCtx.createGain(),st=t0+n[1];
+      osc.type='sine';osc.frequency.value=n[0];
+      g.gain.setValueAtTime(0.0001,st);
+      g.gain.exponentialRampToValueAtTime(0.16,st+0.012);
+      g.gain.exponentialRampToValueAtTime(0.0001,st+0.4);
+      osc.connect(g);g.connect(audioCtx.destination);
+      osc.start(st);osc.stop(st+0.42);
+    });
+  }catch(e){}
+}
 function keepAwake(){
   try{
     if(!navigator.wakeLock||wakeLock||document.visibilityState!=='visible')return;
@@ -574,7 +598,11 @@ function renderObs(){
     +metaLine()+'</div>';
   // 남은 시간은 참가자에게 보이지 않음 — 관찰 시간이 지나면 [설문 시작] 버튼만 나타남
   var sb=document.getElementById('startrate');
-  countdown(obsMs(),function(){},function(){sb.style.display='';});
+  countdown(obsMs(),function(){},function(){
+    sb.style.display='';
+    // 관찰 시간이 실제로 끝난 순간에만 울림 (새로고침으로 이미 지난 화면을 다시 그릴 때는 울리지 않음)
+    if(settings.sound!==false&&Date.now()-run.phStart<obsMs()+1500)chime();
+  });
 }
 
 // ─── 평가 ───
@@ -897,7 +925,9 @@ function renderAdmin(){
     +'<div class="card" style="margin-top:16px"><p class="sectlab">화면 · 테스트 설정</p><div class="toolrow">'
     +'<button class="btn ghost" data-act="tg-test" aria-pressed="'+settings.test+'">테스트 모드 '+(settings.test?'켜짐':'꺼짐')+'</button>'
     +'<button class="btn ghost" data-act="tg-text" aria-pressed="'+settings.bigText+'">큰 글자 '+(settings.bigText?'켜짐':'꺼짐')+'</button>'
-    +'<button class="btn ghost" data-act="tg-dots" aria-pressed="'+settings.bigDots+'">큰 응답 버튼 '+(settings.bigDots?'켜짐':'꺼짐')+'</button></div>'
+    +'<button class="btn ghost" data-act="tg-dots" aria-pressed="'+settings.bigDots+'">큰 응답 버튼 '+(settings.bigDots?'켜짐':'꺼짐')+'</button>'
+    +'<button class="btn ghost" data-act="tg-sound" aria-pressed="'+(settings.sound!==false)+'">관찰 종료 알림음 '+(settings.sound!==false?'켜짐':'꺼짐')+'</button>'
+    +'<button class="btn ghost" data-act="sound-test">소리 들어보기</button></div>'
     +(settings.test?'<p class="hint">테스트 모드: 관찰·교체 대기 건너뛰기 버튼, 평가 화면의 랜덤 입력(R 키)·랜덤+저장(Space)이 생깁니다. 테스트 후 해당 참가자를 초기화하고 모드를 꺼 주세요.</p>':'')
     +'</div>'
     +'<div class="note"><b>데이터 원본은 구글 시트입니다.</b> 분석용 전체 데이터는 시트에서 파일 → 다운로드 → Excel(.xlsx)로 받으세요. 역문항은 7번·16번·17번입니다(8−점수로 역채점).</div>'
@@ -911,6 +941,7 @@ function arm(key){armed=key;setTimeout(function(){if(armed===key){armed=null;if(
 app.addEventListener('click',function(e){
   var b=e.target.closest?e.target.closest('[data-act]'):null;if(!b)return;
   var act=b.getAttribute('data-act');
+  unlockAudio();
   // 화면이 막 바뀐 직후의 더블탭이 엉뚱한 버튼(점수·나가기)을 누르지 않도록 무시 (테스트 모드 제외)
   if(!settings.test&&route.v==='run'&&run&&(act==='dot'||act==='submit'||act==='leave')&&Date.now()-run.phStart<700)return;
   if(act==='pick'){startPid(b.getAttribute('data-pid'));}
@@ -966,6 +997,8 @@ app.addEventListener('click',function(e){
   }
   else if(act==='tg-test'){settings.test=!settings.test;saveSettings();render();}
   else if(act==='tg-text'){settings.bigText=!settings.bigText;saveSettings();applySettings();render();}
+  else if(act==='tg-sound'){settings.sound=(settings.sound===false);saveSettings();render();}
+  else if(act==='sound-test'){chime();}
   else if(act==='tg-dots'){settings.bigDots=!settings.bigDots;saveSettings();applySettings();render();}
   else if(act==='akey-save'){var k=(document.getElementById('akey_in').value||'').trim();if(k){adminKey=k;try{localStorage.setItem(LS_AKEY,k);}catch(er){}fetchPayList();render();}}
   else if(act==='akey-reset'){adminKey='';try{localStorage.removeItem(LS_AKEY);}catch(er){}payFetchState=null;serverPay=null;render();}
