@@ -318,11 +318,26 @@ function flush(){
 }
 function refresh(){
   if(!ENDPOINT)return Promise.resolve(false);
+  var startedAt=Date.now();
   return fetch(ENDPOINT,{redirect:'follow'}).then(function(r){return r.json();}).then(function(res){
     if(res&&res.ok){
       serverAnswered={};
       for(var pid in res.answered){serverAnswered[pid]={};res.answered[pid].forEach(function(t){serverAnswered[pid][t]=true;});}
       queue.forEach(function(q){if(q.op==='deltrial'&&serverAnswered[q.pid])delete serverAnswered[q.pid][q.trial];});   // 삭제 대기 중인 시행은 서버 목록에서 제외
+      // 서버가 기준: 관리자 화면(다른 기기)에서 초기화·삭제된 응답은 이 기기의 사본에서도 제거
+      // (전송 대기 중이거나, 이 요청을 보낸 직후에 저장된 응답은 건드리지 않음)
+      var pend={},ch=false;
+      queue.forEach(function(q){if(!q.op)pend[q.pid+'#'+q.trial]=true;});
+      for(var rp in records){
+        for(var rt in records[rp]){
+          var rr=records[rp][rt];
+          if(pend[rp+'#'+rt]||(serverAnswered[rp]&&serverAnswered[rp][rt]))continue;
+          if(rr&&rr.t&&rr.t>startedAt-8000)continue;
+          delete records[rp][rt];ch=true;
+        }
+        if(!Object.keys(records[rp]).length){delete records[rp];ch=true;}
+      }
+      if(ch)saveRecords();
       serverOk=true;return true;
     }
     serverOk=false;return false;
@@ -381,7 +396,14 @@ function keepAwake(){
     navigator.wakeLock.request('screen').then(function(l){wakeLock=l;l.addEventListener('release',function(){wakeLock=null;});},function(){});
   }catch(e){}
 }
-document.addEventListener('visibilitychange',function(){if(document.visibilityState==='visible'&&route.v==='run')keepAwake();});
+document.addEventListener('visibilitychange',function(){
+  if(document.visibilityState!=='visible')return;
+  if(route.v==='run')keepAwake();
+  else if(route.v==='home')refresh().then(function(){if(route.v==='home')render();});   // 다른 기기에서 바뀐 진행 현황 반영
+});
+setInterval(function(){
+  if(document.visibilityState==='visible'&&route.v==='home')refresh().then(function(){if(route.v==='home')render();});
+},20000);
 function renderCore(){
   clearTimer();
   if(route.v==='run')keepAwake();
@@ -483,20 +505,6 @@ function renderHome(){
     +'</div>';
 }
 
-// ─── 시편 코드 칩 (참가자에게는 가림, 진행자가 누르면 4초만 표시) ───
-function codeChipHTML(trial){
-  return '<button class="codechip masked" data-act="showcode" data-trial="'+trial+'">시편 코드 확인 (진행자용)</button>';
-}
-function showCode(btn,trial){
-  var o=ordOf(run.pid),s=o[trial-1].set,list=[];
-  for(var i=0;i<o.length;i++){if(o[i].set===s)list.push(POS_SHORT[o[i].pos-1]+' '+o[i].material);}
-  btn.classList.remove('masked');btn.style.fontSize='18px';btn.textContent=list.join(' · ');
-  if(codeTimer)clearTimeout(codeTimer);
-  codeTimer=setTimeout(function(){
-    if(!btn.isConnected)return;
-    btn.classList.add('masked');btn.style.fontSize='';btn.textContent='시편 코드 확인 (진행자용)';
-  },4000);
-}
 function modeName(){return run.practice?'연습':(run.demo?'시연':run.pid);}
 function metaLine(){
   var o=ordOf(run.pid)[run.trial-1];
@@ -524,7 +532,6 @@ function renderIntro(){
         :'<li>세트마다 시편 3개를 <b>하나씩 순서대로</b> 관찰하고 평가합니다.</li><li>세트가 끝나면 진행자가 시편을 교체합니다. 정답은 없으니 느낀 대로 응답해 주세요.</li>')
     +'</ul></div>'
     +'<div class="btnrow" style="margin-top:28px"><button class="btn wide" data-act="begin">'+(pr?'연습 시작':'첫 세트 시작')+'</button></div>'
-    +'<div style="margin-top:14px">'+codeChipHTML(run.trial)+'</div>'
     +'<p style="margin-top:40px"><button class="backlink" data-act="leave">세션 나가기</button></p>'
     +metaLine()+'</div>';
 }
@@ -655,7 +662,6 @@ function renderBreak(){
     +'<p class="eyebrow">시편 교체</p>'
     +'<h1 style="font-size:25px;font-weight:600;line-height:1.55;margin-top:14px">세트 '+o.set+' 준비 중입니다<br>잠시 기다려 주세요</h1>'
     +'<div class="btnrow" id="nextset" style="margin-top:44px;display:none"><button class="btn wide" data-act="begin">세트 '+o.set+' 시작</button></div>'
-    +'<div style="margin-top:14px">'+codeChipHTML(run.trial)+'</div>'
     +(settings.test?'<p class="hint">테스트 모드: 아래 버튼으로 대기를 생략할 수 있습니다.</p><button class="btn ghost" data-act="skip">대기 건너뛰기</button>':'')
     +'<p style="margin-top:40px"><button class="backlink" data-act="leave">세션 나가기</button></p>'
     +metaLine()+'</div>';
@@ -687,7 +693,16 @@ function fmtPhone(s){
   return d.slice(0,3)+'-'+d.slice(3,6)+'-'+d.slice(6,10);
 }
 function maskRRN(s){var d=digits(s);return d.length>=7?d.slice(0,6)+'-'+d.charAt(6)+'******':String(s||'');}
-var infoSaved=false,pendingInfoPid=null;
+var infoSaved=false,pendingInfoPid=null,infoBackT=null;
+function infoBack(){
+  if(infoBackT){clearTimeout(infoBackT);infoBackT=null;}
+  var toRun=!!(pendingInfoPid&&run);
+  infoSaved=false;pendingInfoPid=null;
+  history.replaceState(null,'',location.pathname);
+  route=toRun?{v:'run'}:{v:'home'};
+  render();window.scrollTo(0,0);
+  if(!toRun)refresh().then(function(){if(route.v==='home')render();});
+}
 function infoFormHTML(){
   var d=new Date(),iso=d.getFullYear()+'-'+z(d.getMonth()+1)+'-'+z(d.getDate());
   var opts='<option value="">미지정</option>'+PIDS.map(function(p){return '<option value="'+p+'"'+(p===pendingInfoPid?' selected':'')+'>'+p+' ('+COND_LABEL[condOf(p)]+')</option>';}).join('');
@@ -704,15 +719,17 @@ function infoFormHTML(){
     +'<div class="full"><label>계좌번호</label><input id="pi_acct" type="text" inputmode="numeric" autocomplete="off" placeholder="숫자만 입력"></div></div>'
     +'<p class="sectlab" style="margin-top:18px">진행자 기재란</p><div class="frm">'
     +'<div><label>참가자 번호</label><select id="pi_pid">'+opts+'</select></div>'
-    +'<div><label>청구금액</label><input id="pi_amt" type="text" inputmode="numeric" value="10000"></div>'
+    +'<div><label>청구금액</label><input id="pi_amt" type="text" inputmode="numeric" value="8000"></div>'
     +'<div><label>활용일자</label><input type="date" id="pi_dt" value="'+iso+'"></div></div>';
 }
 function renderInfo(){
   if(infoSaved){
     app.innerHTML='<div class="wrap center" style="padding-top:80px"><div class="card" style="padding:36px 24px"><div class="donemark">✓</div>'
-      +'<h1 style="font-size:22px">저장되었습니다</h1><p class="sub">감사합니다. 진행자에게 알려주세요.</p></div>'
-      +'<div class="btnrow">'+(pendingInfoPid&&run?'<button class="btn wide" data-act="info-back">실험 화면으로 돌아가기 ('+pendingInfoPid+')</button>':'')
+      +'<h1 style="font-size:22px">저장되었습니다</h1><p class="sub">감사합니다. 잠시 후 처음 화면으로 이동합니다.</p></div>'
+      +'<div class="btnrow"><button class="btn wide" data-act="info-back">'+(pendingInfoPid&&run?'실험 화면으로 돌아가기 ('+pendingInfoPid+')':'처음 화면으로')+'</button>'
       +'<button class="btn ghost wide" data-act="info-new">다음 참가자 입력</button></div></div>';
+    if(infoBackT)clearTimeout(infoBackT);
+    infoBackT=setTimeout(function(){infoBackT=null;if(infoSaved&&route.v==='info')infoBack();},3500);
     return;
   }
   app.innerHTML='<div class="wrap"><p class="eyebrow">연구 참여 안내</p><h1>참여자 정보 입력</h1>'
@@ -913,7 +930,6 @@ app.addEventListener('click',function(e){
     if(run&&run.ph!=='done'&&!isPractice(run.pid)&&!confirm('세션을 나가시겠습니까? 진행 중인 응답은 저장되지 않습니다.'))return;
     leaveRun();
   }
-  else if(act==='showcode'){showCode(b,Number(b.getAttribute('data-trial')));}
   else if(act==='begin'){setPhase('obs');}
   else if(act==='startrate'){setPhase('rate');}
   else if(act==='skip'){if(run.ph==='obs')setPhase('rate');else setPhase('obs');}
@@ -922,8 +938,8 @@ app.addEventListener('click',function(e){
   else if(act==='rand'){fillRandom();}
   else if(act==='stepauto'){fillRandom();submitRate();}
   else if(act==='info-save'){saveInfo();}
-  else if(act==='info-new'){infoSaved=false;pendingInfoPid=null;render();window.scrollTo(0,0);}
-  else if(act==='info-back'){infoSaved=false;history.replaceState(null,'',location.pathname);route={v:'run'};render();}
+  else if(act==='info-new'){if(infoBackT){clearTimeout(infoBackT);infoBackT=null;}infoSaved=false;pendingInfoPid=null;render();window.scrollTo(0,0);}
+  else if(act==='info-back'){infoBack();}
   else if(act==='home'){history.replaceState(null,'',location.pathname);go({v:'home'});refresh().then(render);}
   else if(act==='refresh'){refresh().then(render);}
   else if(act==='retry'){flush().then(function(){return refresh();}).then(render);}
