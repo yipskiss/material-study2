@@ -484,7 +484,7 @@ var app=document.getElementById('app');
 
 function bannerHTML(){
   if(settings.test)return '<div class="banner">테스트 모드 켜짐 — 실제 실험 전에 [관리자 → 화면·테스트 설정]에서 꺼 주세요. 테스트로 넣은 참가자는 초기화로 지울 수 있어요.</div>';
-  if(route.v==='run'&&run&&run.demo)return '<div class="banner">시연 모드 — 기록되지 않습니다. 대기 시간은 실제와 같으며(관찰 '+OBS_SEC+'초, 교체 '+BREAK_SEC+'초), 오른쪽 아래 [대기 건너뛰기]로 넘길 수 있습니다.</div>';
+  if(route.v==='run'&&run&&run.demo)return '<div class="banner">시연 모드 — 기록되지 않습니다. 관찰 시간은 실제와 같이 '+OBS_SEC+'초이며, 오른쪽 아래 [대기 건너뛰기]로 넘길 수 있습니다. 시편 교체 화면은 버튼을 눌러 넘어갑니다.</div>';
   if(route.v==='run'&&run&&isPractice(run.pid))return '<div class="banner">연습 모드 — 시편 1개로 진행 방식을 익히는 연습입니다. 응답은 기록되지 않습니다.</div>';
   if(route.v==='run')return '';
   if(!ENDPOINT)return '<div class="banner">구글 시트 연결 전 — index.html 상단의 ENDPOINT에 Apps Script 웹 앱 URL을 넣어야 서버 저장이 됩니다. 지금은 이 기기에만 저장돼요.</div>';
@@ -502,7 +502,7 @@ function clearAuto(){if(autoT){clearTimeout(autoT);autoT=null;}}
 function demoBarHTML(){
   var b='style="min-height:42px;padding:8px 16px;font-size:14.5px;box-shadow:var(--shadow);background:var(--surface)"',h='<button class="btn ghost" '+b+' data-act="exit">🏠 홈으로</button>';
   if(!run.demo)return '<div id="demobar" style="position:fixed;right:14px;bottom:14px;z-index:40;display:flex;gap:8px;justify-content:flex-end">'+h+'</div>';
-  if(run.ph==='obs'||run.ph==='break')h+='<button class="btn ghost" '+b+' data-act="skip">대기 건너뛰기</button>';
+  if(run.ph==='obs')h+='<button class="btn ghost" '+b+' data-act="skip">대기 건너뛰기</button>';
   if(run.ph==='rate')h+='<button class="btn ghost" '+b+' data-act="rand">랜덤 입력</button><button class="btn ghost" '+b+' data-act="stepauto">랜덤+저장</button>';
   if(run.ph!=='done')h+='<button class="btn" '+b.replace('background:var(--surface)','background:var(--accent)')+' data-act="autoplay">'+(demoAuto?'■ 자동 진행 정지':'▶ 자동 진행 (대기 생략)')+'</button>';
   return '<div id="demobar" style="position:fixed;right:14px;bottom:14px;z-index:40;display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;max-width:calc(100vw - 28px)">'+h+'</div>';
@@ -727,12 +727,10 @@ function renderBreak(){
   app.innerHTML='<div class="wrap center vwrap">'+bannerHTML()
     +'<p class="eyebrow">시편 교체</p>'
     +'<h1 style="font-size:25px;font-weight:600;line-height:1.55;margin-top:14px">세트 '+o.set+' 준비 중입니다<br>잠시 기다려 주세요</h1>'
-    +'<div class="btnrow" id="nextset" style="margin-top:44px;display:none"><button class="btn wide" data-act="begin">세트 '+o.set+' 시작</button></div>'
-    +(settings.test?'<p class="hint">테스트 모드: 아래 버튼으로 대기를 생략할 수 있습니다.</p><button class="btn ghost" data-act="skip">대기 건너뛰기</button>':'')
+    +'<p class="sub" style="margin-top:12px">진행자가 시편을 준비하면 아래 버튼을 눌러 주세요.</p>'
+    +'<div class="btnrow" style="margin-top:36px"><button class="btn wide" data-act="begin">세트 '+o.set+' 시작</button></div>'
     +'<p style="margin-top:40px"><button class="backlink" data-act="leave">세션 나가기</button></p>'
     +metaLine()+'</div>';
-  var nb=document.getElementById('nextset');
-  countdown(breakMs(),function(){},function(){nb.style.display='';});
 }
 
 function renderDone(){
@@ -918,7 +916,7 @@ function orderBoxHTML(pid){
     rows+='<tr'+(d?' style="opacity:.45"':'')+'><td>'+x.trial+(x.trial===nxt?' ◀ 다음':'')+'</td><td>세트 '+x.set+'</td><td>'+x.level+'</td><td>'+POS_LABEL[x.pos-1]+'</td><td class="mono"><b>'+x.material+'</b></td><td>'+(d?'✓ 저장됨':'')+'</td>'
       +'<td>'+(d?'<button class="del'+(armed==='t'+pid+x.trial?' arm':'')+'" data-act="deltrial" data-pid="'+pid+'" data-trial="'+x.trial+'">'+(armed==='t'+pid+x.trial?'한 번 더 눌러 삭제':'이 시편 기록 삭제')+'</button>':'')+'</td></tr>';
   });
-  return '<p class="hint" style="margin-top:12px"><b>'+pid+'</b> ('+COND_LABEL[condOf(pid)]+') — 세트마다 표의 <b>첫 번째 → 세 번째 순서</b>대로 제시·평가합니다. 세트 사이 교체 30초.</p>'
+  return '<p class="hint" style="margin-top:12px"><b>'+pid+'</b> ('+COND_LABEL[condOf(pid)]+') — 세트마다 표의 <b>첫 번째 → 세 번째 순서</b>대로 제시·평가합니다. 세트 사이 교체는 진행자가 준비되면 시작 버튼으로 넘깁니다.</p>'
     +'<div class="tscroll"><table><thead><tr><th>시행</th><th>세트</th><th>수준</th><th>세트 내 순서</th><th>시편</th><th>상태</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div>';
 }
 function renderAdmin(){
@@ -966,7 +964,7 @@ function renderAdmin(){
     +'<button class="btn ghost" data-act="tg-dots" aria-pressed="'+settings.bigDots+'">큰 응답 버튼 '+(settings.bigDots?'켜짐':'꺼짐')+'</button>'
     +'<button class="btn ghost" data-act="tg-sound" aria-pressed="'+(settings.sound!==false)+'">관찰 종료 알림음 '+(settings.sound!==false?'켜짐':'꺼짐')+'</button>'
     +'<button class="btn ghost" data-act="sound-test">소리 들어보기</button></div>'
-    +(settings.test?'<p class="hint">테스트 모드: 관찰·교체 대기 건너뛰기 버튼, 평가 화면의 랜덤 입력(R 키)·랜덤+저장(Space)이 생깁니다. 테스트 후 해당 참가자를 초기화하고 모드를 꺼 주세요.</p>':'')
+    +(settings.test?'<p class="hint">테스트 모드: 관찰 대기 건너뛰기 버튼, 평가 화면의 랜덤 입력(R 키)·랜덤+저장(Space)이 생깁니다. 테스트 후 해당 참가자를 초기화하고 모드를 꺼 주세요.</p>':'')
     +'</div>'
     +'<div class="note"><b>데이터 원본은 구글 시트입니다.</b> 분석용 전체 데이터는 시트에서 파일 → 다운로드 → Excel(.xlsx)로 받으세요. 역문항은 7번·16번·17번입니다(8−점수로 역채점).</div>'
     +'<div class="note"><b>제시 순서</b> — 세트(Low/Mid/High) 순서는 6가지 순열을 참가자 번호 순으로 순환하고, 세트 안 시편 순서는 회전·반전으로 균형을 맞춥니다. V와 T의 같은 번호는 같은 순서입니다.</div>'
